@@ -1,2 +1,4 @@
 data/
 ckpts_modular/
+.vscode/
+__pycache__

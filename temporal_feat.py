@@ -3,11 +3,11 @@ import argparse
 import os
 import numpy as np
 import torch
-from tem_dataloader import VideoDataset_NR_SlowFast_feature
-
+from tem_dataloader import VideoDataset_temporal_slowfast
 from torchvision import transforms
 from pytorchvideo.models.hub import slowfast_r50
 import torch.nn as nn
+from config import FETV_T2V_model,FETV_vid_path
 
 
 def pack_pathway_output(frames, device):
@@ -39,7 +39,8 @@ def pack_pathway_output(frames, device):
 class slowfast(torch.nn.Module):
     def __init__(self):
         super(slowfast, self).__init__()
-        slowfast_pretrained_features = nn.Sequential(*list(slowfast_r50(pretrained=True).children())[0])
+        slowfast_pretrained_features = nn.Sequential(
+            *list(slowfast_r50(pretrained=True).children())[0])
 
         self.feature_extraction = torch.nn.Sequential()
         self.slow_avg_pool = torch.nn.Sequential()
@@ -47,27 +48,33 @@ class slowfast(torch.nn.Module):
         self.adp_avg_pool = torch.nn.Sequential()
 
         for x in range(0, 5):
-            self.feature_extraction.add_module(str(x), slowfast_pretrained_features[x])
+            self.feature_extraction.add_module(
+                str(x), slowfast_pretrained_features[x])
 
-        self.slow_avg_pool.add_module('slow_avg_pool', slowfast_pretrained_features[5].pool[0])
-        self.fast_avg_pool.add_module('fast_avg_pool', slowfast_pretrained_features[5].pool[1])
-        self.adp_avg_pool.add_module('adp_avg_pool', slowfast_pretrained_features[6].output_pool)
+        self.slow_avg_pool.add_module(
+            'slow_avg_pool', slowfast_pretrained_features[5].pool[0])
+        self.fast_avg_pool.add_module(
+            # 'fast_avg_pool', slowfast_pretrained_features[5].pool[1])
+            # 'fast_avg_pool',nn.AvgPool3d((16,7,7),stride=(1,1,1)))
+            'fast_avg_pool',nn.AdaptiveAvgPool3d((1,1,1)))
+
+        self.adp_avg_pool.add_module(
+            'adp_avg_pool', slowfast_pretrained_features[6].output_pool)
 
     def forward(self, x):
         with torch.no_grad():
-
-            # print(x[0].shape)   
-            # print(x[1].shape)   
-            x = self.feature_extraction(x)
-            # print(x[0].shape)   
-            # print(x[1].shape)   
-            slow_feature = self.slow_avg_pool(x[0])
-            fast_feature = self.fast_avg_pool(x[1])
-
-            slow_feature = self.adp_avg_pool(slow_feature)
-            fast_feature = self.adp_avg_pool(fast_feature)
             
-        return slow_feature, fast_feature
+            # 1*c*frames*h*w
+            x = self.feature_extraction(x)
+            # 1*256*frames*7*7
+            print(x[1].shape)
+            fast_feature = self.fast_avg_pool(x[1])
+            print(fast_feature.shape)
+            # 1*256*1*1*1
+            fast_feature = self.adp_avg_pool(fast_feature)
+            # 1*256*1*1*1
+
+        return fast_feature
 
 
 def main(config):
@@ -79,67 +86,52 @@ def main(config):
 
     resize = config.resize
 
-    transformations = transforms.Compose([transforms.Resize([resize, resize]),transforms.ToTensor(),
+    transformations = transforms.Compose([transforms.Resize([resize, resize]), transforms.ToTensor(),
                                           transforms.Normalize(mean=[0.45, 0.45, 0.45],
                                                                std=[0.225, 0.225, 0.225])])
 
+    # training data
+    for n,t2vmdl in enumerate(FETV_T2V_model):
 
-    ## training data
-    for t2vmdl in config.t2vmodel:
+        videos_dir = FETV_vid_path[n]
 
-        videos_dir = f'/home/user/Documents/vqadata/FETV/{t2vmdl}/videos'
-        datainfo = 'data/LiveVQC_data.mat'
-        
-        trainset = VideoDataset_NR_SlowFast_feature(config.database, 
-            videos_dir, datainfo, transformations, resize, config.num_frame)
+        trainset = VideoDataset_temporal_slowfast(config.database,
+                        videos_dir, transformations, resize)
 
-
-        ## dataloader
+        # dataloader
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=1,
-                                                shuffle=False, num_workers=config.num_workers)
+                        shuffle=False, num_workers=config.num_workers)
 
         # do validation after each epoch
         with torch.no_grad():
             model.eval()
-            for i, (video, mos, video_name) in enumerate(train_loader):
-                video_name = str(i)
-                # print(len(video))
-                # print(video[0].shape) 
-                if not os.path.exists(config.feature_save_folder + t2vmdl + '/' +video_name):
-                    dir_name=config.feature_save_folder + t2vmdl+'/' +video_name
+            for i, video in enumerate(train_loader):
+                if not os.path.exists(config.feature_save_folder + f'/{t2vmdl}'):
+                    dir_name = config.feature_save_folder + f'/{t2vmdl}'
                     os.makedirs(dir_name)
-
-                for idx, ele in enumerate(video):
-                    # swap channel and vid_length_clip
-                    # B*C*T*H*W
-                    # 1*3*num_frames*224*224
-                    ele = ele.permute(0, 2, 1, 3, 4)
-                    # print(ele.shape)
-                    inputs = pack_pathway_output(ele, device)
-                    # print(inputs[0].shape)
-                    slow_feature, fast_feature = model(inputs)
-                    
-                    np.save(dir_name+ '/'+str(idx) + 'slow',
-                            slow_feature.to('cpu').numpy())
-                    np.save(dir_name+'/' + str(idx) + 'fast',
-                            fast_feature.to('cpu').numpy())
-                    # print('done')
-                            
-                            
-        #         break
-        # break
+                
+                # print(len(video))
+                # print(video[0].shape)
+                # swap channel and vid_length_clip
+                # B*C*T*H*W
+                # 1*3*all_frame*224*224
+                video = video.permute(0, 2, 1, 3, 4)
+                inputs = pack_pathway_output(video, device)
+                fast_feature = model(inputs)
+                np.save(dir_name +'/' + str(i),
+                        fast_feature.to('cpu').numpy())
+        
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--database', type=str, default='FETV')
-    # parser.add_argument('--model_name', type=str)
     parser.add_argument('--num_workers', type=int, default=0)
     parser.add_argument('--resize', type=int, default=224)
-    parser.add_argument('--num_frame', type=int, default=32)
+    # parser.add_argument('--num_frame', type=int, default=32)
     parser.add_argument('--gpu_ids', type=list, default=None)
-    parser.add_argument('--feature_save_folder', type=str, default='data/FETVtemporal_16frames/')
-    parser.add_argument('--t2vmodel',type=list,default=['cogvideo','text2video-zero','modelscope-t2v','zeroscope'])
+    parser.add_argument('--feature_save_folder', type=str,
+                        default='data/FETV_temporal_all_frames')
 
     config = parser.parse_args()
 
