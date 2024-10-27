@@ -33,13 +33,10 @@ class VideoDataset_train_val(data.Dataset):
         self.score = []
         random.seed(seed)
         np.random.seed(seed)
-        # video_num=dataInfo.shape[0]
 
         index_rd = np.random.permutation(prompt_num)
         train_index = index_rd[0:int(prompt_num*0.7)]
         val_index = index_rd[int(prompt_num * 0.7):int(prompt_num * 0.8)]
-        # test_index = index_rd[int(prompt_num * 0.8):]
-        # print(test_index[:10])
 
         if database_name == 'train':
             for idx, t2vmdl in enumerate(T2V_model):
@@ -53,12 +50,7 @@ class VideoDataset_train_val(data.Dataset):
                     suffix = "{:03}".format(i)
                     self.video_names.append(t2vmdl+suffix)
                     self.score.append(mos[idx][i])
-        # elif database_name == 'test':
-        #     for idx, t2vmdl in enumerate(T2V_model):
-        #         for i in test_index:
-        #             suffix = "{:03}".format(i)
-        #             self.video_names.append(t2vmdl+suffix)
-        #             self.score.append(mos[idx][i])
+
 
         dataInfo = pd.DataFrame(self.video_names)
         dataInfo['score'] = self.score
@@ -106,6 +98,7 @@ class VideoDataset_train_val(data.Dataset):
 
         frame_len = len(os.listdir(img_path_name))
         start_index = random.randint(0, frame_len-self.frame_num)
+        random_range=list(range(start_index,start_index+8))
 
         # first_file=sorted(tmp,key=lambda x:int(x.split('.')[0]))[0]
         transformed_video = torch.zeros(
@@ -121,41 +114,51 @@ class VideoDataset_train_val(data.Dataset):
             np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
 
         # read 3D features
-        # if self.feature_type == 'Slow':
-        #     feature_folder_name = os.path.join(self.temporalFeat, videoname_idx)
-        #     transformed_feature = torch.zeros([self.frame_num, 2048])
-        #     for i in range(self.frame_num):
-        #         i_index = i
-        #         feature_3D = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_slow_feature.npy'))
-        #         feature_3D = torch.from_numpy(feature_3D)
-        #         feature_3D = feature_3D.squeeze()
-        #         transformed_feature[i] = feature_3D
-        # elif self.feature_type == 'Fast':
-        #     # feature_folder_name = os.path.join(temporal_feat_name, )
-        #     transformed_feature = torch.zeros([self.frame_num, 256])
-        #     for i in range(self.frame_num):
-        #         # print(i)
-        #         i_index = i   #TODO
-        #         feature_3D = np.load(os.path.join(temporal_feat_name,str(i_index) + 'fast_feature.npy'))
-        #         feature_3D = torch.from_numpy(feature_3D)
-        #         feature_3D = feature_3D.squeeze()
-        #         transformed_feature[i] = feature_3D
-        # elif self.feature_type == 'SlowFast':
-        #     feature_folder_name = os.path.join(self.temporalFeat, videoname_idx)
-        #     transformed_feature = torch.zeros([self.frame_num, 2048+256])
-        #     for i in range(self.frame_num):
-        #         i_index = i
-        #         feature_3D_slow = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_slow_feature.npy'))
-        #         feature_3D_slow = torch.from_numpy(feature_3D_slow)
-        #         feature_3D_slow = feature_3D_slow.squeeze()
-        #         feature_3D_fast = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_fast_feature.npy'))
-        #         feature_3D_fast = torch.from_numpy(feature_3D_fast)
-        #         feature_3D_fast = feature_3D_fast.squeeze()
-        #         feature_3D = torch.cat([feature_3D_slow, feature_3D_fast])
-        #         transformed_feature[i] = feature_3D
-        transformed_feature = []
+        if self.feature_type == 'Slow':
+            feature_folder_name = os.path.join(self.temporalFeat, videoname_idx)
+            transformed_feature = torch.zeros([self.frame_num, 2048])
+            for i in range(self.frame_num):
+                i_index = i
+                feature_3D = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_slow_feature.npy'))
+                feature_3D = torch.from_numpy(feature_3D)
+                feature_3D = feature_3D.squeeze()
+                transformed_feature[i] = feature_3D
+        elif self.feature_type == 'Fast':
+            # feature_folder_name = os.path.join(temporal_feat_name, )
+            
+            # transformed_feature = torch.zeros([self.frame_num, 256])
+            # for i in range(self.frame_num):
+            #     # print(i)
+            #     i_index = i   #TODO
+            #     feature_3D = np.load(os.path.join(temporal_feat_name,str(i_index) + '.npy'))
+            #     feature_3D = torch.from_numpy(feature_3D)
+            #     feature_3D = feature_3D.squeeze()
+            #     transformed_feature[i] = feature_3D
+            
+            # 1*256*frames*1*1   
+            feature_3D=np.load(temporal_feat_name+'.npy')
+            feature_3D = torch.from_numpy(feature_3D)
+            feature_3D=feature_3D[:,:,random_range,:,:]
+            feature_3D = feature_3D.squeeze().permute(1,0)
+            # self.frame_num*256
+            
+            
+        elif self.feature_type == 'SlowFast':
+            feature_folder_name = os.path.join(self.temporalFeat, videoname_idx)
+            transformed_feature = torch.zeros([self.frame_num, 2048+256])
+            for i in range(self.frame_num):
+                i_index = i
+                feature_3D_slow = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_slow_feature.npy'))
+                feature_3D_slow = torch.from_numpy(feature_3D_slow)
+                feature_3D_slow = feature_3D_slow.squeeze()
+                feature_3D_fast = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_fast_feature.npy'))
+                feature_3D_fast = torch.from_numpy(feature_3D_fast)
+                feature_3D_fast = feature_3D_fast.squeeze()
+                feature_3D = torch.cat([feature_3D_slow, feature_3D_fast])
+                transformed_feature[i] = feature_3D
+        # transformed_feature = []
 
-        return transformed_video, transformed_feature, video_score, resized_lp
+        return transformed_video, feature_3D, video_score, resized_lp
 
 
 class VideoDataset_test(data.Dataset):

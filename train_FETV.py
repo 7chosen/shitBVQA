@@ -100,12 +100,12 @@ def main(config):
             lp_dir = 'data/FETV_spatial_all_frames'
 
             # temporal features
-            feature_dir = 'data/FETVtemporal'
+            feature_dir = 'data/FETV_temporal_all_frames'
 
             # extract frames
-            imgs_dir = 'data/base_all_frames'
+            imgs_dir = 'data/FETV_base_all_frames'
 
-            datainfo = 'data/spaAVGmos.json'
+            datainfo = 'data/pyIQA_FETV_score/mosfile/spaAVGmos.json'
 
             trainset = VideoDataset_train_val(imgs_dir, feature_dir, lp_dir, datainfo,
                                               transformations_train, 'train', config.crop_size,
@@ -140,7 +140,7 @@ def main(config):
             for i, (video, feature_3D, mos, lp) in enumerate(train_loader):
 
                 video = video.to(device)
-                # feature_3D = feature_3D.to(device)
+                feature_3D = feature_3D.to(device)
                 lp = lp.to(device)
                 labels = mos.to(device).float()
 

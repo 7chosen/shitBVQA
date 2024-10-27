@@ -55,8 +55,8 @@ class slowfast(torch.nn.Module):
             'slow_avg_pool', slowfast_pretrained_features[5].pool[0])
         self.fast_avg_pool.add_module(
             # 'fast_avg_pool', slowfast_pretrained_features[5].pool[1])
-            # 'fast_avg_pool',nn.AvgPool3d((16,7,7),stride=(1,1,1)))
-            'fast_avg_pool',nn.AdaptiveAvgPool3d((1,1,1)))
+            'fast_avg_pool',nn.AvgPool2d(kernel_size=7))
+            # 'fast_avg_pool',nn.AdaptiveAvgPool3d((1,1,1)))
 
         self.adp_avg_pool.add_module(
             'adp_avg_pool', slowfast_pretrained_features[6].output_pool)
@@ -66,14 +66,16 @@ class slowfast(torch.nn.Module):
             
             # 1*c*frames*h*w
             x = self.feature_extraction(x)
+            
             # 1*256*frames*7*7
-            print(x[1].shape)
-            fast_feature = self.fast_avg_pool(x[1])
-            print(fast_feature.shape)
-            # 1*256*1*1*1
-            fast_feature = self.adp_avg_pool(fast_feature)
-            # 1*256*1*1*1
+            # fast_feature=x[1]
+            fast_feature=x[1].squeeze()
+            fast_feature = self.fast_avg_pool(fast_feature)
+            fast_feature=torch.unsqueeze(fast_feature,0)
+            # print(fast_feature.shape)
 
+            # 1*256*frames*1*1
+            
         return fast_feature
 
 
@@ -120,6 +122,7 @@ def main(config):
                 fast_feature = model(inputs)
                 np.save(dir_name +'/' + str(i),
                         fast_feature.to('cpu').numpy())
+
         
 
 
