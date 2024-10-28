@@ -15,7 +15,7 @@ class Identity(nn.Module):
 
 
 class ViTbCLIP_SpatialTemporal_modular_dropout(torch.nn.Module):
-    def __init__(self, feat_len=8, sr=True, tr=False, dropout_sp=0.2, dropout_tp=0.2):
+    def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
         super(ViTbCLIP_SpatialTemporal_modular_dropout, self).__init__()
         ViT_B_16, _ = clip.load("ViT-B/16")
 

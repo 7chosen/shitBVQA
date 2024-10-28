@@ -48,7 +48,7 @@ def main(config):
         if config.model_name == 'ViTbCLIP_SpatialTemporal_modular_dropout':
             model = model.float()
 
-        if config.trained_model != 'None':
+        if config.trained_model != 'none':
             # load the trained model
             print('loading the pretrained model')
             model.load_state_dict(torch.load(config.trained_model))
@@ -105,7 +105,7 @@ def main(config):
             # extract frames
             imgs_dir = 'data/FETV_base_all_frames'
 
-            datainfo = 'data/pyIQA_FETV_score/mosfile/spaAVGmos.json'
+            datainfo = 'data/pyIQA_FETV_score/mosFile/temAVGmos.json'
 
             trainset = VideoDataset_train_val(imgs_dir, feature_dir, lp_dir, datainfo,
                                               transformations_train, 'train', config.crop_size,
@@ -189,7 +189,7 @@ def main(config):
                 y_output_st = np.zeros([len(valset)])
                 for i, (video, feature_3D, mos, lp) in enumerate(val_loader):
                     video = video.to(device)
-                    # feature_3D = feature_3D.to(device)
+                    feature_3D = feature_3D.to(device)
                     lp = lp.to(device)
                     label[i] = mos.item()
                     outputs_b, outputs_s, outputs_t, outputs_st = model(
@@ -209,23 +209,24 @@ def main(config):
                 val_PLCC_st, val_SRCC_st, val_KRCC_st, val_RMSE_st = performance_fit(
                     label, y_output_st)
 
-                # print(
-                #     'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                #         epoch + 1,
-                #         val_SRCC_b, val_KRCC_b, val_PLCC_b, val_RMSE_b))
+                print(
+                    'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                        epoch + 1,
+                        val_SRCC_b, val_KRCC_b, val_PLCC_b, val_RMSE_b))
                 print(
                     'Epoch {} completed. The result on the S validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                         epoch + 1,
                         val_SRCC_s, val_KRCC_s, val_PLCC_s, val_RMSE_s))
-                # print(
-                #     'Epoch {} completed. The result on the T validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                #         epoch + 1,
-                #         val_SRCC_t, val_KRCC_t, val_PLCC_t, val_RMSE_t))
+                print(
+                    'Epoch {} completed. The result on the T validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                        epoch + 1,
+                        val_SRCC_t, val_KRCC_t, val_PLCC_t, val_RMSE_t))
                 print(
                     'Epoch {} completed. The result on the ST validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                         epoch + 1,
                         val_SRCC_st, val_KRCC_st, val_PLCC_st, val_RMSE_st))
 
+                
                 label = np.zeros([len(testset)])
                 y_output_b = np.zeros([len(testset)])
                 y_output_s = np.zeros([len(testset)])
@@ -236,9 +237,9 @@ def main(config):
                     label[i] = mos.item()
                     for j in range(count):
                         video[j] = video[j].to(device)
-                        # feature_3D = feature_3D.to(device)
+                        feature_3D[j] = feature_3D[j].to(device)
                         lp[j] = lp[j].to(device)
-                        b, s, t, st = model(video[j], feature_3D, lp[j])
+                        b, s, t, st = model(video[j], feature_3D[j], lp[j])
                         outputs_b+=b
                         outputs_s+=s
                         outputs_t+=t
@@ -263,22 +264,23 @@ def main(config):
                 test_PLCC_st, test_SRCC_st, test_KRCC_st, test_RMSE_st = performance_fit(
                     label, y_output_st)
 
-                # print(
-                #     'Epoch {} completed. The result on the base test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                #         epoch + 1,
-                #         test_SRCC_b, test_KRCC_b, test_PLCC_b, test_RMSE_b))
+                print(
+                    'Epoch {} completed. The result on the base test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                        epoch + 1,
+                        test_SRCC_b, test_KRCC_b, test_PLCC_b, test_RMSE_b))
                 print(
                     'Epoch {} completed. The result on the S test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                         epoch + 1,
                         test_SRCC_s, test_KRCC_s, test_PLCC_s, test_RMSE_s))
-                # print(
-                #     'Epoch {} completed. The result on the T test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                #         epoch + 1,
-                #         test_SRCC_t, test_KRCC_t, test_PLCC_t, test_RMSE_t))
+                print(
+                    'Epoch {} completed. The result on the T test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                        epoch + 1,
+                        test_SRCC_t, test_KRCC_t, test_PLCC_t, test_RMSE_t))
                 print(
                     'Epoch {} completed. The result on the ST test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                         epoch + 1,
                         test_SRCC_st, test_KRCC_st, test_PLCC_st, test_RMSE_st))
+                
 
                 if val_SRCC_st > best_val_criterion:
                     print(
@@ -306,17 +308,17 @@ def main(config):
                                     test_PLCC_st, test_RMSE_st]
 
                     print('Saving model...')
-                    save_model_name = 'ckpts_modular/8frames_spa_no_weight.pth'
-                    torch.save(model.state_dict(), save_model_name)
+                    # save_model_name = 'ckpts_modular/8frames_spa_no_weight.pth'
+                    torch.save(model.state_dict(), config.save_path)
 
         print('Training completed.')
 
-        # print(
-        #     'The best training result on the base validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_val_b[0], best_val_b[1], best_val_b[2], best_val_b[3]))
-        # print(
-        #     'The best training result on the base test dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_test_b[0], best_test_b[1], best_test_b[2], best_test_b[3]))
+        print(
+            'The best training result on the base validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                best_val_b[0], best_val_b[1], best_val_b[2], best_val_b[3]))
+        print(
+            'The best training result on the base test dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                best_test_b[0], best_test_b[1], best_test_b[2], best_test_b[3]))
 
         print(
             'The best training result on the S validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
@@ -325,12 +327,12 @@ def main(config):
             'The best training result on the S test dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                 best_test_s[0], best_test_s[1], best_test_s[2], best_test_s[3]))
 
-        # print(
-        #     'The best training result on the T validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_val_t[0], best_val_t[1], best_val_t[2], best_val_t[3]))
-        # print(
-        #     'The best training result on the T test dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_test_t[0], best_test_t[1], best_test_t[2], best_test_t[3]))
+        print(
+            'The best training result on the T validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                best_val_t[0], best_val_t[1], best_val_t[2], best_val_t[3]))
+        print(
+            'The best training result on the T test dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                best_test_t[0], best_test_t[1], best_test_t[2], best_test_t[3]))
 
         print(
             'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
@@ -359,17 +361,17 @@ def main(config):
         all_test_PLCC_st.append(best_test_st[2])
         all_test_RMSE_st.append(best_test_st[3])
 
-    # print(
-    #     'The base median results SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-    #         np.median(all_test_SRCC_b), np.median(all_test_KRCC_b), np.median(all_test_PLCC_b), np.median(all_test_RMSE_b)))
+    print(
+        'The base median results SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+            np.median(all_test_SRCC_b), np.median(all_test_KRCC_b), np.median(all_test_PLCC_b), np.median(all_test_RMSE_b)))
 
     print(
         'The S median results SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
             np.median(all_test_SRCC_s), np.median(all_test_KRCC_s), np.median(all_test_PLCC_s), np.median(all_test_RMSE_s)))
 
-    # print(
-    #     'The T median results SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-    #         np.median(all_test_SRCC_t), np.median(all_test_KRCC_t), np.median(all_test_PLCC_t), np.median(all_test_RMSE_t)))
+    print(
+        'The T median results SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+            np.median(all_test_SRCC_t), np.median(all_test_KRCC_t), np.median(all_test_PLCC_t), np.median(all_test_RMSE_t)))
 
     print(
         'The ST median results SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
@@ -384,7 +386,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', type=str,
                         default='ViTbCLIP_SpatialTemporal_modular_dropout')
     parser.add_argument('--feat_len', type=int, default=8)
-    parser.add_argument('--total_loop', type=int, default=5)
+    parser.add_argument('--total_loop', type=int, default=1)
     parser.add_argument('--prompt_num', type=int, default=619)
     # training parameters
 
@@ -410,9 +412,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--loss_type', type=str, default='plcc')
 
-    parser.add_argument('--trained_model', type=str,
-                        # default='None')
-                        default='ckpts_modular/ViTbCLIP_SpatialTemporal_modular_LSVQ.pth')
+    parser.add_argument('--trained_model', type=str,default='none')
+    parser.add_argument('--save_path',type=str)
 
     config = parser.parse_args()
 

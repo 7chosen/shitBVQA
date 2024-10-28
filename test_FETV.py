@@ -33,7 +33,7 @@ def main(config):
     # training data
 
     if config.database == 'KoNViD-1k':
-        videos_dir = 'data/konvid1k_image_all_fps1'
+        imgs_dir = 'data/konvid1k_image_all_fps1'
         datainfo = 'data/KoNViD-1k_data.mat'
         lp_dir = 'data/konvid1k_LP_ResNet18'
         feature_dir = 'data/KoNViD-1k_slowfast'
@@ -41,10 +41,10 @@ def main(config):
     elif config.database == 'FETV':
         lp_dir = 'data/FETV_spatial_all_frames'
         # temporal features
-        feature_dir = 'data/FETVtemporal'
+        feature_dir = 'data/FETV_temporal_all_frames'
         # extract frames
-        videos_dir = 'data/base_all_frames'
-        datainfo = 'data/spaAVGmos.json'
+        imgs_dir = 'data/FETV_base_all_frames'
+        datainfo = 'data/pyIQA_FETV_score/mosFile/spaAVGmos.json'
 
     transformations_test = transforms.Compose(
         [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),  # transforms.Resize(config.resize),
@@ -52,7 +52,7 @@ def main(config):
          transforms.ToTensor(),
          transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
-    testset = VideoDataset_test(videos_dir, feature_dir,
+    testset = VideoDataset_test(imgs_dir, feature_dir,
                                      lp_dir, datainfo, transformations_test,
                                      config.crop_size, 'Fast', prompt_num=config.prompt_num)
 
@@ -70,11 +70,13 @@ def main(config):
         for i, (video, feature_3D, mos, lp, count) in enumerate(test_loader):
             outputs_b=outputs_s=outputs_t=outputs_st=0
             label[i] = mos.item()
+            print(len(video))
+            
             for j in range(count):
                 video[j] = video[j].to(device)
-                # feature_3D = feature_3D.to(device)
+                feature_3D[j] = feature_3D[j].to(device)
                 lp[j] = lp[j].to(device)
-                b, s, t, st = model(video[j], feature_3D, lp[j])
+                b, s, t, st = model(video[j], feature_3D[j], lp[j])
                 outputs_b+=b
                 outputs_s+=s
                 outputs_t+=t
@@ -99,10 +101,10 @@ def main(config):
             label, y_output_st)
 
         # print(config.database)
-        # print('The result on the base test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(test_SRCC_b, test_KRCC_b, test_PLCC_b, test_RMSE_b))
+        print('The result on the base test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(test_SRCC_b, test_KRCC_b, test_PLCC_b, test_RMSE_b))
         print('The result on the S test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
             test_SRCC_s, test_KRCC_s, test_PLCC_s, test_RMSE_s))
-        # print('The result on the T test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(test_SRCC_t, test_KRCC_t, test_PLCC_t, test_RMSE_t))
+        print('The result on the T test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(test_SRCC_t, test_KRCC_t, test_PLCC_t, test_RMSE_t))
         print('The result on the ST test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
             test_SRCC_st, test_KRCC_st, test_PLCC_st, test_RMSE_st))
 
@@ -116,14 +118,13 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', type=str,
                         default='ViTbCLIP_SpatialTemporal_modular_dropout')
     parser.add_argument('--prompt_num', type=int, default=619)
-
     parser.add_argument('--num_workers', type=int, default=6)
 
     # misc
     parser.add_argument('--trained_model', type=str,
                         default='ckpts_modular/8frames_spa_no_weight.pth')
     # parser.add_argument('--data_path', type=str, default='/')
-    parser.add_argument('--feature_type', type=str, default='fast')
+    # parser.add_argument('--feature_type', type=str, default='fast')
     parser.add_argument('--multi_gpu', action='store_true')
     parser.add_argument('--gpu_ids', type=list, default=None)
     parser.add_argument('--resize', type=int, default=256)

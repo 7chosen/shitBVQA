@@ -72,7 +72,7 @@ class slowfast(torch.nn.Module):
             fast_feature=x[1].squeeze()
             fast_feature = self.fast_avg_pool(fast_feature)
             fast_feature=torch.unsqueeze(fast_feature,0)
-            # print(fast_feature.shape)
+            print(fast_feature.shape)
 
             # 1*256*frames*1*1
             

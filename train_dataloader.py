@@ -12,7 +12,7 @@ import numpy as np
 import scipy.io as scio
 import math
 # from random import shuffle
-from config import T2V_model
+from config import FETV_T2V_model
 
 
 def read_float_with_comma(num):
@@ -39,13 +39,13 @@ class VideoDataset_train_val(data.Dataset):
         val_index = index_rd[int(prompt_num * 0.7):int(prompt_num * 0.8)]
 
         if database_name == 'train':
-            for idx, t2vmdl in enumerate(T2V_model):
+            for idx, t2vmdl in enumerate(FETV_T2V_model):
                 for i in train_index:
                     suffix = "{:03}".format(i)
                     self.video_names.append(t2vmdl+suffix)
                     self.score.append(mos[idx][i])
         elif database_name == 'val':
-            for idx, t2vmdl in enumerate(T2V_model):
+            for idx, t2vmdl in enumerate(FETV_T2V_model):
                 for i in val_index:
                     suffix = "{:03}".format(i)
                     self.video_names.append(t2vmdl+suffix)
@@ -96,7 +96,7 @@ class VideoDataset_train_val(data.Dataset):
         # seed = np.random.randint(20231001)
         # random.seed(seed)
 
-        frame_len = len(os.listdir(img_path_name))
+        frame_len = len(os.listdir(img_path_name))-1
         start_index = random.randint(0, frame_len-self.frame_num)
         random_range=list(range(start_index,start_index+8))
 
@@ -111,7 +111,7 @@ class VideoDataset_train_val(data.Dataset):
             read_frame = self.transform(read_frame)
             transformed_video[i-start_index] = read_frame
             resized_lp[i-start_index] = torch.from_numpy(
-            np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
+                np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
 
         # read 3D features
         if self.feature_type == 'Slow':
@@ -140,6 +140,7 @@ class VideoDataset_train_val(data.Dataset):
             feature_3D = torch.from_numpy(feature_3D)
             feature_3D=feature_3D[:,:,random_range,:,:]
             feature_3D = feature_3D.squeeze().permute(1,0)
+            # return shape of [8,256]
             # self.frame_num*256
             
             
@@ -180,7 +181,7 @@ class VideoDataset_test(data.Dataset):
         index_rd = np.random.permutation(prompt_num)
         test_index = index_rd[int(prompt_num * 0.8):]
 
-        for idx, t2vmdl in enumerate(T2V_model):
+        for idx, t2vmdl in enumerate(FETV_T2V_model):
             for i in test_index:
                 suffix = "{:03}".format(i)
                 self.video_names.append(t2vmdl+suffix)
@@ -232,63 +233,72 @@ class VideoDataset_test(data.Dataset):
         frame_len = len(os.listdir(img_path_name))
 
         # test all frames
-        start_index = 0
-        count = frame_len//self.frame_num
-        # print(f'start from {start_index}th frame, collect {frame_len} frames')
-        # first_file=sorted(tmp,key=lambda x:int(x.split('.')[0]))[0]
-        # start_index=int(first_file[:-4])
         transformed_video_all=[]
         resized_lp_all=[]
+        fast_feature_all=[]
+        feature_3D=np.load(temporal_feat_name+'.npy')
+        feature_3D = torch.from_numpy(feature_3D)
+        # print(feature_3D.shape)
         
-        for j in range(count):
+        
+        start_index=frame_len-1
+        count=int(frame_len/self.frame_num)
+        # if frame_len%self.frame_num != 0:
+            # flag=1
+
+            
+       
+        for j in range(count,0,-1):
             transformed_video = torch.zeros(
                 [self.frame_num, video_channel, video_height_crop, video_width_crop])
             resized_lp = torch.zeros([self.frame_num, 5*256])
-            for i in range(start_index, start_index+self.frame_num):
+            fast_feature=torch.zeros([self.frame_num,256])
+            
+            specified_rge=list(range(start_index-self.frame_num,start_index))
+            
+            
+            for i in range(start_index, start_index-self.frame_num,-1):
                 imge_name = os.path.join(img_path_name, f'{i}.png')
                 read_frame = Image.open(imge_name)
                 read_frame = read_frame.convert('RGB')
                 read_frame = self.transform(read_frame)
                 transformed_video[i-start_index] = read_frame
                 resized_lp[i-start_index] = torch.from_numpy(
-                np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
-            transformed_video_all.append(transformed_video)
-            resized_lp_all.append(resized_lp)
-            start_index+=self.frame_num
+                        np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
+                
             
-        # read 3D features
-        # if self.feature_type == 'Slow':
-        #     feature_folder_name = os.path.join(self.temporalFeat, videoname_idx)
-        #     transformed_feature = torch.zeros([self.frame_num, 2048])
-        #     for i in range(self.frame_num):
-        #         i_index = i
-        #         feature_3D = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_slow_feature.npy'))
-        #         feature_3D = torch.from_numpy(feature_3D)
-        #         feature_3D = feature_3D.squeeze()
-        #         transformed_feature[i] = feature_3D
-        # elif self.feature_type == 'Fast':
-        #     # feature_folder_name = os.path.join(temporal_feat_name, )
-        #     transformed_feature = torch.zeros([self.frame_num, 256])
-        #     for i in range(self.frame_num):
-        #         # print(i)
-        #         i_index = i   #TODO
-        #         feature_3D = np.load(os.path.join(temporal_feat_name,str(i_index) + 'fast_feature.npy'))
-        #         feature_3D = torch.from_numpy(feature_3D)
-        #         feature_3D = feature_3D.squeeze()
-        #         transformed_feature[i] = feature_3D
-        # elif self.feature_type == 'SlowFast':
-        #     feature_folder_name = os.path.join(self.temporalFeat, videoname_idx)
-        #     transformed_feature = torch.zeros([self.frame_num, 2048+256])
-        #     for i in range(self.frame_num):
-        #         i_index = i
-        #         feature_3D_slow = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_slow_feature.npy'))
-        #         feature_3D_slow = torch.from_numpy(feature_3D_slow)
-        #         feature_3D_slow = feature_3D_slow.squeeze()
-        #         feature_3D_fast = np.load(os.path.join(feature_folder_name, 'feature_' + str(i_index) + '_fast_feature.npy'))
-        #         feature_3D_fast = torch.from_numpy(feature_3D_fast)
-        #         feature_3D_fast = feature_3D_fast.squeeze()
-        #         feature_3D = torch.cat([feature_3D_slow, feature_3D_fast])
-        #         transformed_feature[i] = feature_3D
-        transformed_feature = []
+            
+            fast_feature=feature_3D[:,:,specified_rge,:,:]
+            # print(fast_feature.shape)
+            fast_feature= fast_feature.squeeze().permute(1,0)
+            transformed_video_all.append(transformed_video)
+            fast_feature_all.append(fast_feature)
+            resized_lp_all.append(resized_lp)
+            start_index-=self.frame_num
+            
+        if start_index >= 0:
+            count+=1
+            transformed_video = torch.zeros(
+                [self.frame_num, video_channel, video_height_crop, video_width_crop])
+            resized_lp = torch.zeros([self.frame_num, 5*256])
+            fast_feature=torch.zeros([self.frame_num,256])
+            specified_rge=list(range(0,self.frame_num))
 
-        return transformed_video_all, transformed_feature, video_score, resized_lp_all, count
+            for i in range(self.frame_num):
+                imge_name = os.path.join(img_path_name, f'{i}.png')
+                read_frame = Image.open(imge_name)
+                read_frame = read_frame.convert('RGB')
+                read_frame = self.transform(read_frame)
+                transformed_video[i-start_index] = read_frame
+                resized_lp[i-start_index] = torch.from_numpy(
+                        np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
+            fast_feature=feature_3D[:,:,specified_rge,:,:]
+            fast_feature= fast_feature.squeeze().permute(1,0)
+            transformed_video_all.append(transformed_video)
+            fast_feature_all.append(fast_feature)
+            resized_lp_all.append(resized_lp)   
+
+        # print(count)   
+            
+
+        return transformed_video_all, fast_feature_all, video_score, resized_lp_all, count
