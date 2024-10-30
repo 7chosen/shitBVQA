@@ -87,7 +87,7 @@ class VideoDataset_temporal_slowfast(data.Dataset):
         # else:
             # vid_sec_min = int(video_length / video_frame_rate)
         # vid_sec_min = 1
-        video_length=video_second*8 # make vid_len to be a multiple of 8
+        video_length_round=video_second*8 # make vid_len to be a multiple of 8
 
         video_channel = 3
         transformed_frame_all = torch.zeros(
@@ -105,7 +105,7 @@ class VideoDataset_temporal_slowfast(data.Dataset):
             cap.release()
         elif filename[-1] == 'f':
             current_idx = 0
-            while 1 and current_idx < video_length:
+            while current_idx < video_length:
                 try:
                     cap.seek(current_idx)
                     frame_rgb = cap.convert("RGB")
@@ -117,6 +117,13 @@ class VideoDataset_temporal_slowfast(data.Dataset):
                     break
         else:
             raise Exception('vid path NOT right')
+        
+        if video_length % 8 != 0 :
+            video_length=video_length_round+8
+            last_8_ele=transformed_frame_all[-8:]
+            transformed_frame_all=transformed_frame_all[:video_length_round]
+            transformed_frame_all=torch.cat((transformed_frame_all,last_8_ele))
+            
         # transformed_video_all = []
 
         # video_length=video_length/video_second

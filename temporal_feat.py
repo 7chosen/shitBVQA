@@ -118,6 +118,7 @@ def main(config):
                 # B*C*T*H*W
                 # 1*3*all_frame*224*224
                 video = video.permute(0, 2, 1, 3, 4)
+                # print(video.shape)
                 inputs = pack_pathway_output(video, device)
                 fast_feature = model(inputs)
                 np.save(dir_name +'/' + str(i),
