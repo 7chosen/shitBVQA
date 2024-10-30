@@ -77,98 +77,57 @@ class VideoDataset_train(data.Dataset):
 
         # if flag == 1, use the global sparse: random pick {self.frame_num} consecutive frames, return a list
         # else use the local sparse: select all frames by {self.frame_num} frames a chunk, return a 2-dim list
+        flag = random.randint(0, 1)
         feature_3D = np.load(temporal_feat_name+'.npy')
         feature_3D = torch.from_numpy(feature_3D)
         frame_len=len(os.listdir(img_path_name))
         count=int(frame_len/self.frame_num)
 
-        # flag = random.randint(0, 1)
-        flag=1
         
-        trans_img_all = []
-        resized_lap_all = []
-        fast_feature_all = []
-        trans_img_1 = []
-        resized_lap_1 = []
-        fast_feature_1 = []
+        final_trans_img = torch.zeros([self.frame_num,video_channel,video_height_crop,video_width_crop])
+        final_spa = torch.zeros(self.frame_num,5*256)
+        final_tem = []
         
 
-        # using local
+        # local dense
+        # select {self.frame_num} imgs with a interval
         if flag == 0:
- 
-            start_index=0
-
-            for i in range(count):
-                trans_img = torch.zeros([self.frame_num, video_channel, video_height_crop, video_width_crop])
-                lap_feat = torch.zeros([self.frame_num, 5*256])
-                fast_feature = torch.zeros([self.frame_num, 256])
-                specified_rge = list(
-                    range(start_index, start_index + self.frame_num))
-                for j in range(start_index, start_index + self.frame_num):
-                    img_name = os.path.join(img_path_name, f'{j}.png')
-                    read_frame = Image.open(img_name).convert('RGB')
-                    read_frame = self.transform(read_frame)
-                    trans_img[j-start_index] = read_frame
-                    lap_feat[j-start_index] = torch.from_numpy(
-                        np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
-                fast_feature = feature_3D[:, :, specified_rge, :, :]
-                fast_feature = fast_feature.squeeze().permute(1, 0)
-                trans_img_all.append(trans_img)
-                fast_feature_all.append(fast_feature)
-                resized_lap_all.append(lap_feat)
-                start_index += self.frame_num
-            if 0 < frame_len - start_index < self.frame_num:
-                count += 1
-                trans_img = torch.zeros([self.frame_num, video_channel, video_height_crop, video_width_crop])
-                lap_feat = torch.zeros([self.frame_num, 5*256])
-                fast_feature = torch.zeros([self.frame_num, 256])
-                start_index = frame_len-self.frame_num
-                for i in range(start_index, frame_len):
-                    img_name = os.path.join(img_path_name, f'{i}.png')
-                    read_frame = Image.open(img_name).convert('RGB')
-                    read_frame = self.transform(read_frame)
-                    trans_img[i-start_index] = read_frame
-                    lap_feat[i-start_index] = torch.from_numpy(
-                        np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
-                fast_feature = feature_3D[:, :, -8:, :, :]
-                fast_feature = fast_feature.squeeze().permute(1, 0)
-                trans_img_all.append(trans_img)
-                fast_feature_all.append(fast_feature)
-                resized_lap_all.append(lap_feat)
-
-        # flage = 1, use random {self.frame_num} consecutive imgs
-        else:
-            
-            frame_len = len(os.listdir(img_path_name))-1
-            start_index = random.randint(0, frame_len-self.frame_num)
-            random_range = list(range(start_index, start_index+self.frame_num))
-
-            trans_img_1 = torch.zeros(
-                [self.frame_num, video_channel, video_height_crop, video_width_crop])
-            resized_lap_1 = torch.zeros([self.frame_num, 5*256])
-            for i in range(start_index, start_index + self.frame_num):
+            # make sure it always select the first {self.frame_num} frames
+            frame_len = self.frame_num * count
+            random_range = list([x] for x in range(0,frame_len,count))
+            for idx,i in enumerate(range(0,frame_len,count)):
                 img_name = os.path.join(img_path_name, f'{i}.png')
                 read_frame = Image.open(img_name)
                 read_frame = read_frame.convert('RGB')
                 read_frame = self.transform(read_frame)
-                trans_img_1[i-start_index] = read_frame
-                resized_lap_1[i-start_index] = torch.from_numpy(
+                final_trans_img[idx] = read_frame
+                final_spa[idx] = torch.from_numpy(
+                    np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
+            
+        # flage = 1, use random {self.frame_num} consecutive imgs
+        # global sparse
+        else:
+            frame_len = frame_len - 1
+            start_index = random.randint(0, frame_len-self.frame_num)
+            random_range = list(range(start_index, start_index+self.frame_num))
+            for idx,i in enumerate(range(start_index, start_index + self.frame_num)):
+                img_name = os.path.join(img_path_name, f'{i}.png')
+                read_frame = Image.open(img_name)
+                read_frame = read_frame.convert('RGB')
+                read_frame = self.transform(read_frame)
+                final_trans_img[idx] = read_frame
+                final_spa[idx] = torch.from_numpy(
                     np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
 
-            # read 3D features
-            # 1*256*frames*1*1
-            fast_feature_1= feature_3D[:, :, random_range, :, :]
-            fast_feature_1= fast_feature_1.squeeze().permute(1, 0)
-            # return shape of [8,256]
-            # self.frame_num*256
-        # print(1)
-
-        # print('1 ',len(trans_img_all))
-        # print('2 ',len(fast_feature_all))
-        # print('3 ',len(resized_lap_all))
- 
-        return trans_img_all, trans_img_1, fast_feature_all, fast_feature_1, \
-                resized_lap_all, resized_lap_1, video_score, count, flag
+        # read 3D features
+        # 1*256*frames*1*1 ->  self.frame_num*256
+        mid_value=feature_3D[:,:,random_range,:,:].squeeze().permute(1,0)
+        final_tem=mid_value
+        
+        if len(final_spa) != self.frame_num:
+            raise Exception('sample is not right')
+        
+        return final_trans_img,  final_tem,  final_spa, video_score, flag
 
 
 class VideoDataset_val_test(data.Dataset):
@@ -311,7 +270,7 @@ class VideoDataset_val_test(data.Dataset):
         tem_local = torch.zeros([self.frame_num,256])
         spa_local = torch.zeros([self.frame_num,256*5])
         trans_img_local = torch.zeros([self.frame_num,video_channel,video_height_crop,video_width_crop])
-        # make sure always select the first 8 frames
+        # make sure always select the first {self.frame_num} frames
         count2=int(frame_len/self.frame_num)
         frame_len=count2*self.frame_num
         fixed_range=list([x] for x in range(0,frame_len,count2))

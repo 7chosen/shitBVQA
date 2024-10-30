@@ -37,6 +37,7 @@ def main(config):
         # extract frames
         imgs_dir = 'data/FETV_base_all_frames'
         datainfo = config.mosfile
+        print('using the mos file: ',datainfo )
          
     transformations_vandt = transforms.Compose(
         [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),  # transforms.Resize(config.resize),
@@ -61,7 +62,6 @@ def main(config):
         y_output_st = np.zeros([len(testset)])
         for i, (vid_chunk_g, vid_chunk_l, tem_g, tem_l,
                 spa_g, spa_l, mos, count) in enumerate(test_loader):
-
             outputs_b = outputs_s = outputs_t = outputs_st = 0
             label[i] = mos.item()
             for j in range(count):
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_ids', type=list, default=None)
     parser.add_argument('--resize', type=int, default=256)
     parser.add_argument('--crop_size', type=int, default=224)
-    parser.add_argument('--mosfile',type=str,default='data/pyIQA_FETV_score/mosFile/spaAVGmos.json')
+    parser.add_argument('--mosfile',type=str,default='data/pyIQA_FETV_score/mosFile/temAVGmos.json')
 
     config = parser.parse_args()
 

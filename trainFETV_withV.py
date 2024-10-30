@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import argparse
 # import json
+import json
 import os
 
 import numpy as np
@@ -22,10 +23,10 @@ from torch.amp import GradScaler
 
 def main(config):
 
-    for i in range(config.total_loop):
-        config.exp_version = i
-        print('%d round training starts here' % i)
-        seed = i * 1
+    for loop in range(config.total_loop):
+        config.exp_version = loop
+        print('%d round training starts here' % loop)
+        seed = loop * 1
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -96,7 +97,8 @@ def main(config):
             spa_feat_dir = 'data/FETV_spatial_all_frames'
             tem_feat_dir = 'data/FETV_temporal_all_frames'
             imgs_dir = 'data/FETV_base_all_frames'
-            mosfile = 'data/pyIQA_FETV_score/mosFile/temAVGmos.json'
+            mosfile = config.mosfile
+            print('using the mos file: ',mosfile)
             trainset = VideoDataset_train(imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
                                           transformations_train, config.crop_size,
                                           prompt_num=config.prompt_num, seed=seed)
@@ -123,41 +125,20 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk, vid_1, tem_feat, tem_1, spa_feat, spa_1, 
-                    mos, count, flag) in enumerate(train_loader):
+            for i, (vid_chunk_g, tem_feat_g, spa_feat_g, mos, _) in enumerate(train_loader):
+                
+                # x=len(list(filter(lambda i: i==0,flag)))
+                # print(f'this batch has {x} eles use local dense, total num is {len(flag)}')
                 
                 optimizer.zero_grad()
                 labels = mos.to(device).float()
-                if flag == 0:
-                    print('using local sparse')
-                    outputs_b = outputs_s = outputs_t = outputs_st = 0
-                    for j in range(count):
-                        vid_chunk[j] = vid_chunk[j].to(device)
-                        tem_feat[j] = tem_feat[j].to(device)
-                        spa_feat[j] = spa_feat[j].to(device)
-                        with torch.autocast(device_type='cuda', dtype=torch.float16):
-                            b, s, t, st = model(vid_chunk[j], tem_feat[j], spa_feat[j])
-                        outputs_b += b
-                        outputs_s += s
-                        outputs_t += t
-                        outputs_st += st
-                    count = count.to(device)
-                    outputs_b, outputs_s, outputs_t, outputs_st = \
-                        outputs_b/count, outputs_s/count, outputs_t/count, outputs_st/count
-                    with torch.autocast(device_type='cuda', dtype=torch.float16):
-                        loss = criterion(labels, outputs_st)
-                
-                else:
-                    print('using global sparse')
-                    vid_1 = vid_1.to(device)
-                    tem_1 = tem_1.to(device)
-                    spa_1 = spa_1.to(device)
-
-                    with torch.autocast(device_type='cuda', dtype=torch.float16):
-                        outputs_b, outputs_s, outputs_t, outputs_st = model(
-                            vid_1, tem_1, spa_1)
-                        loss = criterion(labels, outputs_st)
-
+                vid_chunk_g = vid_chunk_g.to(device)
+                tem_feat_g = tem_feat_g.to(device)
+                spa_feat_g = spa_feat_g.to(device)
+                with torch.autocast(device_type='cuda', dtype=torch.float16):
+                    outputs_b, outputs_s, outputs_t, outputs_st = model(
+                        vid_chunk_g, tem_feat_g, spa_feat_g)
+                    loss = criterion(labels, outputs_st)
                 batch_losses.append(loss.item())
                 batch_losses_each_disp.append(loss.item())
                 scaler.scale(loss).backward()
@@ -169,7 +150,7 @@ def main(config):
                     avg_loss_epoch = sum(
                         batch_losses_each_disp) / (config.print_samples // config.train_batch_size)
                     print('Epoch: %d/%d | Step: %d/%d | Training loss: %.4f' %
-                          (epoch + 1, config.epochs, i + 1, len(trainset) // config.train_batch_size,
+                          (epoch + 1, config.epochs, loop + 1, len(trainset) // config.train_batch_size,
                            avg_loss_epoch))
                     batch_losses_each_disp = []
                     print('CostTime: {:.4f}'.format(
@@ -194,14 +175,16 @@ def main(config):
                 y_output_s = np.zeros([len(valset)])
                 y_output_t = np.zeros([len(valset)])
                 y_output_st = np.zeros([len(valset)])
-                for i, (vid_chunk, vid_chunk_1, tem_feat, feature_3D_1,
-                        spa_feat, lp_1, mos, count) in enumerate(val_loader):
+                for i, (vid_chunk_g, vid_chunk_l, tem_feat_g, tem_feat_l,
+                        spa_feat_g, spa_feat_l, mos, count) in enumerate(val_loader):
+                    label[i] = mos.item()
+                    outputs_b = outputs_s = outputs_t = outputs_st = 0
                     
                     for j in range(count):
-                        vid_chunk[j] = vid_chunk[j].to(device)
-                        tem_feat[j] = tem_feat[j].to(device)
-                        spa_feat[j] = spa_feat[j].to(device)
-                        b, s, t, st = model(vid_chunk[j], tem_feat[j], spa_feat[j])
+                        vid_chunk_g[j] = vid_chunk_g[j].to(device)
+                        tem_feat_g[j] = tem_feat_g[j].to(device)
+                        spa_feat_g[j] = spa_feat_g[j].to(device)
+                        b, s, t, st = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j])
                         outputs_b += b
                         outputs_s += s
                         outputs_t += t
@@ -210,10 +193,10 @@ def main(config):
                     outputs_b, outputs_s, outputs_t, outputs_st = \
                         outputs_b/count, outputs_s/count, outputs_t/count, outputs_st/count
 
-                    vid_chunk_1 = vid_chunk_1.to(device)
-                    feature_3D_1 = feature_3D_1.to(device)
-                    lp_1 = lp_1.to(device)
-                    b1, s1, t1, st1 = model(vid_chunk_1, feature_3D_1, lp_1)
+                    vid_chunk_l = vid_chunk_l.to(device)
+                    tem_feat_l = tem_feat_l.to(device)
+                    spa_feat_l = spa_feat_l.to(device)
+                    b1, s1, t1, st1 = model(vid_chunk_l, tem_feat_l, spa_feat_l)
                     outputs_b = (outputs_b + b1) / 2
                     outputs_s = (outputs_s + s1) / 2
                     outputs_t = (outputs_t + t1) / 2
@@ -262,8 +245,7 @@ def main(config):
                                    val_PLCC_st, val_RMSE_st]
 
                     print('Saving model...')
-                    # save_model_name = 'ckpts_modular/8frames_spa_no_weight.pth'
-                    torch.save(model.state_dict(), config.save_path)
+                    torch.save(model.state_dict(), f'ckpts_modular/{loop}.pth')
 
         print('Training completed.')
 
@@ -283,6 +265,13 @@ def main(config):
             'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                 best_val_st[0], best_val_st[1], best_val_st[2], best_val_st[3]))
 
+        data = {"b":best_val_b,
+                "s":best_val_s,
+                "t":best_val_t,
+                "st":best_val_st}
+
+        with open(f'logs/log{loop}.json','w') as f:
+            json.dump(data,f,indent=4)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -318,6 +307,7 @@ if __name__ == '__main__':
     parser.add_argument('--loss_type', type=str, default='plcc')
     parser.add_argument('--trained_model', type=str, default='none')
     parser.add_argument('--save_path', type=str)
+    parser.add_argument('--mosfile',type=str,default='data/pyIQA_FETV_score/mosFile/temAVGmos.json')
 
     config = parser.parse_args()
 
