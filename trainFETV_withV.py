@@ -31,7 +31,7 @@ def main(config):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if config.model_name == 'ViTbCLIP_SpatialTemporal_dropout':
-            model = modular.ViTbCLIP_SpatialTemporal_modular_dropout(feat_len=config.feat_len)
+            model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=config.feat_len)
 
         print('The current model is ' + config.model_name)
 
@@ -46,12 +46,13 @@ def main(config):
 
         if config.trained_model != 'none':
             # load the trained model
-            print('loading the pretrained model: ',config.trained_model)
-            model.load_state_dict(torch.load(config.trained_model,weights_only=1))
+            print('loading the pretrained model: ', config.trained_model)
+            model.load_state_dict(torch.load(
+                config.trained_model, weights_only=1))
 
         # optimizer
         optimizer = optim.Adam(
-            model.parameters(), lr=config.conv_base_lr, weight_decay=0.0000001)
+            model.parameters(), lr=config.lr, weight_decay=0.0000001)
 
         scheduler = optim.lr_scheduler.StepLR(
             optimizer, step_size=config.decay_interval, gamma=config.decay_ratio)
@@ -65,6 +66,8 @@ def main(config):
             criterion = nn.L1Loss().to(device)
         elif config.loss_type == 'Huberloss':
             criterion = nn.HuberLoss().to(device)
+
+        model.clip.logit_scale.requires_grad = False
 
         param_num = 0
         for param in model.parameters():
@@ -81,15 +84,14 @@ def main(config):
 
         transformations_train = transforms.Compose(  # transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC)  transforms.Resize(config.resize)
             [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),
-             transforms.RandomCrop(config.crop_size), 
+             transforms.RandomCrop(config.crop_size),
              transforms.ToTensor(),
              transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
         transformations_vandt = transforms.Compose(
             [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),  # transforms.Resize(config.resize),
-            transforms.CenterCrop(config.crop_size),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
-
+             transforms.CenterCrop(config.crop_size),
+             transforms.ToTensor(),
+             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
         # training data
         if config.database == 'FETV':
@@ -98,18 +100,17 @@ def main(config):
             tem_feat_dir = 'data/FETV_temporal_all_frames'
             imgs_dir = 'data/FETV_base_all_frames'
             mosfile = config.mosfile
-            print('using the mos file: ',mosfile)
+            print('using the mos file: ', mosfile)
             trainset = VideoDataset_train(imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
                                           transformations_train, config.crop_size,
                                           prompt_num=config.prompt_num, seed=seed)
             valset = VideoDataset_val_test(imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-                                        transformations_vandt, 'val', config.crop_size,
-                                        prompt_num=config.prompt_num, seed=seed)
-        
-        
+                                           transformations_vandt, 'val', config.crop_size,
+                                           prompt_num=config.prompt_num, seed=seed)
+
         # dataloader
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=config.train_batch_size,
-                                                # batch_size=1,
+                                                   # batch_size=1,
                                                    shuffle=True, num_workers=config.num_workers, drop_last=True)
         val_loader = torch.utils.data.DataLoader(valset, batch_size=1,
                                                  shuffle=False, num_workers=config.num_workers)
@@ -126,10 +127,10 @@ def main(config):
             batch_losses_each_disp = []
             session_start_time = time.time()
             for i, (vid_chunk_g, tem_feat_g, spa_feat_g, mos, _) in enumerate(train_loader):
-                
+
                 # x=len(list(filter(lambda i: i==0,flag)))
                 # print(f'this batch has {x} eles use local dense, total num is {len(flag)}')
-                
+
                 optimizer.zero_grad()
                 labels = mos.to(device).float()
                 vid_chunk_g = vid_chunk_g.to(device)
@@ -165,7 +166,7 @@ def main(config):
             scheduler.step()
             lr = scheduler.get_last_lr()
             print('The current learning rate is {:.06f}'.format(lr[0]))
-            
+
         # ======================================
         # do validation after each epoch
             with torch.no_grad():
@@ -179,12 +180,13 @@ def main(config):
                         spa_feat_g, spa_feat_l, mos, count) in enumerate(val_loader):
                     label[i] = mos.item()
                     outputs_b = outputs_s = outputs_t = outputs_st = 0
-                    
+
                     for j in range(count):
                         vid_chunk_g[j] = vid_chunk_g[j].to(device)
                         tem_feat_g[j] = tem_feat_g[j].to(device)
                         spa_feat_g[j] = spa_feat_g[j].to(device)
-                        b, s, t, st = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j])
+                        b, s, t, st = model(
+                            vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j])
                         outputs_b += b
                         outputs_s += s
                         outputs_t += t
@@ -196,7 +198,8 @@ def main(config):
                     vid_chunk_l = vid_chunk_l.to(device)
                     tem_feat_l = tem_feat_l.to(device)
                     spa_feat_l = spa_feat_l.to(device)
-                    b1, s1, t1, st1 = model(vid_chunk_l, tem_feat_l, spa_feat_l)
+                    b1, s1, t1, st1 = model(
+                        vid_chunk_l, tem_feat_l, spa_feat_l)
                     outputs_b = (outputs_b + b1) / 2
                     outputs_s = (outputs_s + s1) / 2
                     outputs_t = (outputs_t + t1) / 2
@@ -207,10 +210,14 @@ def main(config):
                     y_output_t[i] = outputs_t.item()
                     y_output_st[i] = outputs_st.item()
 
-                val_PLCC_b, val_SRCC_b, val_KRCC_b, val_RMSE_b = performance_fit(label, y_output_b)
-                val_PLCC_s, val_SRCC_s, val_KRCC_s, val_RMSE_s = performance_fit(label, y_output_s)
-                val_PLCC_t, val_SRCC_t, val_KRCC_t, val_RMSE_t = performance_fit(label, y_output_t)
-                val_PLCC_st, val_SRCC_st, val_KRCC_st, val_RMSE_st = performance_fit(label, y_output_st)
+                val_PLCC_b, val_SRCC_b, val_KRCC_b, val_RMSE_b = performance_fit(
+                    label, y_output_b)
+                val_PLCC_s, val_SRCC_s, val_KRCC_s, val_RMSE_s = performance_fit(
+                    label, y_output_s)
+                val_PLCC_t, val_SRCC_t, val_KRCC_t, val_RMSE_t = performance_fit(
+                    label, y_output_t)
+                val_PLCC_st, val_SRCC_st, val_KRCC_st, val_RMSE_st = performance_fit(
+                    label, y_output_st)
 
                 print(
                     'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
@@ -252,11 +259,11 @@ def main(config):
         print(
             'The best training result on the base validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                 best_val_b[0], best_val_b[1], best_val_b[2], best_val_b[3]))
-       
+
         print(
             'The best training result on the S validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                 best_val_s[0], best_val_s[1], best_val_s[2], best_val_s[3]))
-      
+
         print(
             'The best training result on the T validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                 best_val_t[0], best_val_t[1], best_val_t[2], best_val_t[3]))
@@ -265,13 +272,14 @@ def main(config):
             'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                 best_val_st[0], best_val_st[1], best_val_st[2], best_val_st[3]))
 
-        data = {"b":best_val_b,
-                "s":best_val_s,
-                "t":best_val_t,
-                "st":best_val_st}
+        # data = {"b":best_val_b,
+        #         "s":best_val_s,
+        #         "t":best_val_t,
+        #         "st":best_val_st}
 
-        with open(f'logs/log{loop}.json','w') as f:
-            json.dump(data,f,indent=4)
+        # with open(f'logs/log{loop}.json','w') as f:
+        #     json.dump(data,f,indent=4)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -286,7 +294,7 @@ if __name__ == '__main__':
     # training parameters
 
     # original 1e-5
-    parser.add_argument('--conv_base_lr', type=float, default=1e-5)
+    parser.add_argument('--lr', type=float, default=1e-5)
     parser.add_argument('--decay_ratio', type=float, default=0.9)
     parser.add_argument('--decay_interval', type=int, default=2)
     parser.add_argument('--n_trial', type=int, default=0)
@@ -307,7 +315,8 @@ if __name__ == '__main__':
     parser.add_argument('--loss_type', type=str, default='plcc')
     parser.add_argument('--trained_model', type=str, default='none')
     parser.add_argument('--save_path', type=str)
-    parser.add_argument('--mosfile',type=str,default='data/pyIQA_FETV_score/mosFile/temAVGmos.json')
+    parser.add_argument('--mosfile', type=str,
+                        default='data/pyIQA_FETV_score/mosFile/temAVGmos.json')
 
     config = parser.parse_args()
 

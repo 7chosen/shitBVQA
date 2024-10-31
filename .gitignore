@@ -1,5 +1,6 @@
 data/
 ckpts_modular/
 .vscode/
-__pycache__
+*__pycache__
 logs/
+expri.py

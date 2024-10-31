@@ -34,7 +34,7 @@ def main(config):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if config.model_name == 'ViTbCLIP_SpatialTemporal_modular_dropout':
-            model = modular.ViTbCLIP_SpatialTemporal_modular_dropout(
+            model = modular.ViTbCLIP_SpatialTemporal_dropout(
                 feat_len=config.feat_len)
 
         print('The current model is ' + config.model_name)
@@ -51,7 +51,8 @@ def main(config):
         if config.trained_model != 'none':
             # load the trained model
             print('loading the pretrained model')
-            model.load_state_dict(torch.load(config.trained_model,weights_only=1))
+            model.load_state_dict(torch.load(
+                config.trained_model, weights_only=1))
 
         # optimizer
         optimizer = optim.Adam(
@@ -86,14 +87,14 @@ def main(config):
 
         transformations_train = transforms.Compose(  # transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC)  transforms.Resize(config.resize)
             [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),
-             transforms.RandomCrop(config.crop_size), 
+             transforms.RandomCrop(config.crop_size),
              transforms.ToTensor(),
              transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
         transformations_vandt = transforms.Compose(
             [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),  # transforms.Resize(config.resize),
-            transforms.CenterCrop(config.crop_size),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
+             transforms.CenterCrop(config.crop_size),
+             transforms.ToTensor(),
+             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
         # training data
         if config.database == 'FETV':
 
@@ -112,8 +113,8 @@ def main(config):
                                           transformations_train, config.crop_size,
                                           prompt_num=config.prompt_num, seed=seed)
             valset = VideoDataset_val_test(imgs_dir, feature_dir, lp_dir, datainfo,
-                                        transformations_vandt, 'val', config.crop_size,
-                                        prompt_num=config.prompt_num, seed=seed)
+                                           transformations_vandt, 'val', config.crop_size,
+                                           prompt_num=config.prompt_num, seed=seed)
             testset = VideoDataset_val_test(imgs_dir, feature_dir, lp_dir, datainfo,
                                             transformations_vandt, 'test', config.crop_size,
                                             prompt_num=config.prompt_num, seed=seed)
@@ -178,7 +179,7 @@ def main(config):
             scheduler.step()
             lr = scheduler.get_last_lr()
             print('The current learning rate is {:.06f}'.format(lr[0]))
-            
+
             # ======================================
             # do validation after each epoch
             with torch.no_grad():
@@ -235,7 +236,7 @@ def main(config):
                 y_output_s = np.zeros([len(testset)])
                 y_output_t = np.zeros([len(testset)])
                 y_output_st = np.zeros([len(testset)])
-                for i, (video, feature_3D, lp, mos,count) in enumerate(test_loader):
+                for i, (video, feature_3D, lp, mos, count) in enumerate(test_loader):
                     outputs_b = outputs_s = outputs_t = outputs_st = 0
                     label[i] = mos.item()
                     for j in range(count):

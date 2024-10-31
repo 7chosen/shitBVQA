@@ -14,7 +14,7 @@ def main(config):
     print(device)
 
     if config.model_name == 'ViTbCLIP_SpatialTemporal_modular_dropout':
-        model = modular.ViTbCLIP_SpatialTemporal_modular_dropout(feat_len=8)
+        model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=8)
 
     if config.multi_gpu:
         model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
@@ -27,7 +27,7 @@ def main(config):
 
     # load the trained model
     print(f'loading the trained model {config.trained_model}')
-    model.load_state_dict(torch.load(config.trained_model,weights_only=1))
+    model.load_state_dict(torch.load(config.trained_model, weights_only=1))
 
     # training data
     if config.database == 'FETV':
@@ -37,8 +37,8 @@ def main(config):
         # extract frames
         imgs_dir = 'data/FETV_base_all_frames'
         datainfo = config.mosfile
-        print('using the mos file: ',datainfo )
-         
+        print('using the mos file: ', datainfo)
+
     transformations_vandt = transforms.Compose(
         [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),  # transforms.Resize(config.resize),
          transforms.CenterCrop(config.crop_size),
@@ -47,7 +47,7 @@ def main(config):
 
     testset = VideoDataset_val_test(imgs_dir, feature_dir,
                                     lp_dir, datainfo, transformations_vandt, 'test',
-                                    config.crop_size, prompt_num=config.prompt_num, frame_num=config.frame_num)
+                                    config.crop_size, prompt_num=config.prompt_num, frame_num=config.frame_num, seed=config.seed)
 
     test_loader = torch.utils.data.DataLoader(testset, batch_size=1,
                                               shuffle=False, num_workers=config.num_workers)
@@ -81,6 +81,8 @@ def main(config):
             vid_chunk_l = vid_chunk_l.to(device)
             tem_l = tem_l.to(device)
             spa_l = spa_l.to(device)
+            # outputs_b,outputs_s,outputs_t,outputs_st=model(vid_chunk_l,tem_l,spa_l)
+
             b1, s1, t1, st1 = model(vid_chunk_l, tem_l, spa_l)
             outputs_b = (outputs_b + b1) / 2
             outputs_s = (outputs_s + s1) / 2
@@ -121,15 +123,18 @@ if __name__ == '__main__':
                         default='ViTbCLIP_SpatialTemporal_modular_dropout')
     parser.add_argument('--prompt_num', type=int, default=619)
     parser.add_argument('--num_workers', type=int, default=6)
-    parser.add_argument('--frame_num',type=int,default=8)
+    parser.add_argument('--frame_num', type=int, default=8)
 
     # misc
-    parser.add_argument('--trained_model', type=str,default='ckpts_modular/first_train.pth')
+    parser.add_argument('--trained_model', type=str,
+                        default='ckpts_modular/first_train.pth')
     parser.add_argument('--multi_gpu', action='store_true')
     parser.add_argument('--gpu_ids', type=list, default=None)
     parser.add_argument('--resize', type=int, default=256)
     parser.add_argument('--crop_size', type=int, default=224)
-    parser.add_argument('--mosfile',type=str,default='data/pyIQA_FETV_score/mosFile/temAVGmos.json')
+    parser.add_argument('--mosfile', type=str,
+                        default='data/pyIQA_FETV_score/mosFile/temAVGmos.json')
+    parser.add_argument('--seed', type=int)
 
     config = parser.parse_args()
 
