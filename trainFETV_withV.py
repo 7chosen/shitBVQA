@@ -126,20 +126,25 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk_g, tem_feat_g, spa_feat_g, mos, _) in enumerate(train_loader):
+            for i, (vid_chunk_g, tem_feat_g, spa_feat_g, t_mos, s_mos) in enumerate(train_loader):
 
                 # x=len(list(filter(lambda i: i==0,flag)))
                 # print(f'this batch has {x} eles use local dense, total num is {len(flag)}')
 
                 optimizer.zero_grad()
-                labels = mos.to(device).float()
+                labels = s_mos.to(device).float()
+                labelt = t_mos.to(device).float()
                 vid_chunk_g = vid_chunk_g.to(device)
                 tem_feat_g = tem_feat_g.to(device)
                 spa_feat_g = spa_feat_g.to(device)
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
-                    outputs_b, outputs_s, outputs_t, outputs_st = model(
+                    tmidb, tmids, tmidt, tmidst = model(
                         vid_chunk_g, tem_feat_g, spa_feat_g)
-                    loss = criterion(labels, outputs_st)
+                    # loss = criterion(labels, outputs_st)
+                    loss_s= criterion(labels, tmidst[0])
+                    loss_t= criterion(labelt, tmidst[1])
+                    loss=(loss_s+loss_t)/2
+
                 batch_losses.append(loss.item())
                 batch_losses_each_disp.append(loss.item())
                 scaler.scale(loss).backward()
@@ -171,85 +176,109 @@ def main(config):
         # do validation after each epoch
             with torch.no_grad():
                 model.eval()
-                label = np.zeros([len(valset)])
-                y_output_b = np.zeros([len(valset)])
-                y_output_s = np.zeros([len(valset)])
-                y_output_t = np.zeros([len(valset)])
-                y_output_st = np.zeros([len(valset)])
+                labelt = np.zeros([len(valset)])
+                labels = np.zeros([len(valset)])
+                Tem_y_b = np.zeros([len(valset)])
+                Tem_y_s = np.zeros([len(valset)])
+                Tem_y_t = np.zeros([len(valset)])
+                Tem_y_st = np.zeros([len(valset)])
+                Spa_y_b = np.zeros([len(valset)])
+                Spa_y_s = np.zeros([len(valset)])
+                Spa_y_t = np.zeros([len(valset)])
+                Spa_y_st = np.zeros([len(valset)])
                 for i, (vid_chunk_g, vid_chunk_l, tem_feat_g, tem_feat_l,
-                        spa_feat_g, spa_feat_l, mos, count) in enumerate(val_loader):
-                    label[i] = mos.item()
-                    outputs_b = outputs_s = outputs_t = outputs_st = 0
+                        spa_feat_g, spa_feat_l, t_mos, s_mos,count) in enumerate(val_loader):
+                    labelt[i] = t_mos.item()
+                    labels[i] = s_mos.item()
+                    tmidb = tmids = tmidt = tmidst = 0
+                    smidb = smids = smidt = smidst = 0
+                    
+
 
                     for j in range(count):
                         vid_chunk_g[j] = vid_chunk_g[j].to(device)
                         tem_feat_g[j] = tem_feat_g[j].to(device)
                         spa_feat_g[j] = spa_feat_g[j].to(device)
-                        b, s, t, st = model(
-                            vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j])
-                        outputs_b += b
-                        outputs_s += s
-                        outputs_t += t
-                        outputs_st += st
-                    count = count.to(device)
-                    outputs_b, outputs_s, outputs_t, outputs_st = \
-                        outputs_b/count, outputs_s/count, outputs_t/count, outputs_st/count
+                        b, s, t, st = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j])
+
+                        smidb += b[0]
+                        smids += s[0]
+                        smidt += t[0]
+                        smidst += st[0]
+                        tmidb += b[1]
+                        tmids += s[1]
+                        tmidt += t[1]
+                        tmidst += st[1]
+
+                    count=count.to(device)
+
+                    tmidb, tmids, tmidt, tmidst = tmidb/count, tmids/count, tmidt/count, tmidst/count
+                    smidb, smids, smidt, smidst = smidb/count, smids/count, smidt/count, smidst/count
 
                     vid_chunk_l = vid_chunk_l.to(device)
                     tem_feat_l = tem_feat_l.to(device)
                     spa_feat_l = spa_feat_l.to(device)
                     b1, s1, t1, st1 = model(
                         vid_chunk_l, tem_feat_l, spa_feat_l)
-                    outputs_b = (outputs_b + b1) / 2
-                    outputs_s = (outputs_s + s1) / 2
-                    outputs_t = (outputs_t + t1) / 2
-                    outputs_st = (outputs_st + st1) / 2
 
-                    y_output_b[i] = outputs_b.item()
-                    y_output_s[i] = outputs_s.item()
-                    y_output_t[i] = outputs_t.item()
-                    y_output_st[i] = outputs_st.item()
+                    tmidb = (tmidb + b1[1]) / 2
+                    tmids = (tmids + s1[1]) / 2
+                    tmidt = (tmidt + t1[1]) / 2
+                    tmidst = (tmidst + st1[1]) / 2
+                    smidb = (smidb + b1[0]) / 2
+                    smids = (smids + s1[0]) / 2
+                    smidt = (smidt + t1[0]) / 2
+                    smidst = (smidst + st1[0]) / 2
 
-                val_PLCC_b, val_SRCC_b, val_KRCC_b, val_RMSE_b = performance_fit(
-                    label, y_output_b)
-                val_PLCC_s, val_SRCC_s, val_KRCC_s, val_RMSE_s = performance_fit(
-                    label, y_output_s)
-                val_PLCC_t, val_SRCC_t, val_KRCC_t, val_RMSE_t = performance_fit(
-                    label, y_output_t)
-                val_PLCC_st, val_SRCC_st, val_KRCC_st, val_RMSE_st = performance_fit(
-                    label, y_output_st)
+                    Tem_y_b[i] = tmidb.item()
+                    Tem_y_s[i] = tmids.item()
+                    Tem_y_t[i] = tmidt.item()
+                    Tem_y_st[i] = tmidst.item()
+                    Spa_y_b[i] = smidb.item()
+                    Spa_y_s[i] = smids.item()
+                    Spa_y_t[i] = smidt.item()
+                    Spa_y_st[i] = smidst.item()
+
+                tPLCC_b, tSRCC_b, tKRCC_b, tRMSE_b = performance_fit(
+                    labelt, Tem_y_b)
+                tPLCC_s, tSRCC_s, tKRCC_s, tRMSE_s = performance_fit(
+                    labelt, Tem_y_s)
+                tPLCC_t, tSRCC_t, tKRCC_t, tRMSE_t = performance_fit(
+                    labelt, Tem_y_t)
+                tPLCC_st, tSRCC_st, tKRCC_st, tRMSE_st = performance_fit(
+                    labelt, Tem_y_st)
 
                 print(
                     'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                         epoch + 1,
-                        val_SRCC_b, val_KRCC_b, val_PLCC_b, val_RMSE_b))
+                        tSRCC_b, tKRCC_b, tPLCC_b, tRMSE_b))
                 print(
                     'Epoch {} completed. The result on the S validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                         epoch + 1,
-                        val_SRCC_s, val_KRCC_s, val_PLCC_s, val_RMSE_s))
+                        tSRCC_s, tKRCC_s, tPLCC_s, tRMSE_s))
                 print(
                     'Epoch {} completed. The result on the T validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                         epoch + 1,
-                        val_SRCC_t, val_KRCC_t, val_PLCC_t, val_RMSE_t))
+                        tSRCC_t, tKRCC_t, tPLCC_t, tRMSE_t))
                 print(
                     'Epoch {} completed. The result on the ST validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                         epoch + 1,
-                        val_SRCC_st, val_KRCC_st, val_PLCC_st, val_RMSE_st))
+                        tSRCC_st, tKRCC_st, tPLCC_st, tRMSE_st))
 
         # ===================
         # save model
-                if val_SRCC_st > best_val_criterion:
+                if tSRCC_st > best_val_criterion:
                     print(
                         "Update best model using best_val_criterion in epoch {}".format(epoch + 1))
-                    best_val_criterion = val_SRCC_st
-                    best_val_b = [val_SRCC_b, val_KRCC_b,
-                                  val_PLCC_b, val_RMSE_b]
-                    best_val_s = [val_SRCC_s, val_KRCC_s,
-                                  val_PLCC_s, val_RMSE_s]
-                    best_val_t = [val_SRCC_t, val_KRCC_t,
-                                  val_PLCC_t, val_RMSE_t]
-                    best_val_st = [val_SRCC_st, val_KRCC_st,
-                                   val_PLCC_st, val_RMSE_st]
+                    best_val_criterion = tSRCC_st
+                    best_val_b = [tSRCC_b, tKRCC_b,
+                                  tPLCC_b, tRMSE_b]
+                    best_val_s = [tSRCC_s, tKRCC_s,
+                                  tPLCC_s, tRMSE_s]
+                    best_val_t = [tSRCC_t, tKRCC_t,
+                                  tPLCC_t, tRMSE_t]
+                    best_val_st = [tSRCC_st, tKRCC_st,
+                                   tPLCC_st, tRMSE_st]
 
                     print('Saving model...')
                     torch.save(model.state_dict(), f'ckpts_modular/{loop}.pth')
@@ -316,7 +345,7 @@ if __name__ == '__main__':
     parser.add_argument('--trained_model', type=str, default='none')
     parser.add_argument('--save_path', type=str)
     parser.add_argument('--mosfile', type=str,
-                        default='data/pyIQA_FETV_score/mosFile/temAVGmos.json')
+                        default='data/FETV.csv')
 
     config = parser.parse_args()
 

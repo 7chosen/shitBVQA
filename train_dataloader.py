@@ -27,68 +27,64 @@ class VideoDataset_train(data.Dataset):
                  crop_size, prompt_num, frame_num=8, seed=0):
         super(VideoDataset_train, self).__init__()
 
-        with open(mosfile_path, 'r') as f:
-            mos = json.load(f)
-        self.video_names = []
-        self.score = []
+        data_file=pd.read_csv(mosfile_path)
+        spa_file=data_file.iloc[:,3]
+        tem_file=data_file.iloc[:,4]
+        model_name=data_file.iloc[:,1]
+        
         random.seed(seed)
         np.random.seed(seed)
-
         index_rd = np.random.permutation(prompt_num)
         train_index = index_rd[0:int(prompt_num*0.7)]
-        for idx, t2vmdl in enumerate(FETV_T2V_model):
-            for i in train_index:
-                suffix = "{:03}".format(i)
-                self.video_names.append(t2vmdl+suffix)
-                self.score.append(mos[idx][i])
-        dataInfo = pd.DataFrame(self.video_names)
-        dataInfo['score'] = self.score
-        dataInfo.columns = ['file_names', 'MOS']
-        self.video_names = dataInfo['file_names'].tolist()
-        self.score = dataInfo['MOS'].tolist()
+        
+        self.img_path_dir=[]
+        self.s_feat_name=[]
+        self.t_feat_name=[]
+        self.t_score = []
+        self.s_score=[]
+        
+        for idx in train_index:
+            str_idx=str(idx)
+            idx_copy=idx
+            for j in range(4):
+                mdl=model_name[idx_copy]
+                # self.video_names.append(mdl+str_idx)
+                self.t_score.append(tem_file[idx_copy])
+                self.s_score.append(spa_file[idx_copy])
+                self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
+                self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
+                self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
+                idx_copy+=prompt_num
+        
         self.crop_size = crop_size
-        self.imgs_dir = imgs_dir
-        self.temporalFeat = temporalFeat
-        self.spatialFeat = spatialFeat
         self.transform = transform
-        self.length = len(self.video_names)
         self.frame_num = frame_num
 
     def __len__(self):
-        return self.length
+        return len(self.t_score)
 
     def __getitem__(self, idx):
-
-        video_name = self.video_names[idx]
-        t2vmodel_name = video_name[:-3]
-        # remove leading zeros
-        videoname_idx = int(video_name[-3:])
-        video_score = torch.FloatTensor(np.array(float(self.score[idx])))
-
-        img_path_name = os.path.join(self.imgs_dir, t2vmodel_name, str(videoname_idx))
-        spatial_feat_name = os.path.join(self.spatialFeat, t2vmodel_name, str(videoname_idx))
-        temporal_feat_name = os.path.join(self.temporalFeat, t2vmodel_name, str(videoname_idx))
+        
+        video_t_score = torch.FloatTensor(np.array(float(self.t_score[idx])))
+        video_s_score = torch.FloatTensor(np.array(float(self.s_score[idx])))
+        img_path_name = self.img_path_dir[idx]
+        spatial_feat_name = self.s_feat_name[idx]
+        temporal_feat_name = self.t_feat_name[idx] 
 
         video_channel = 3
-
-        # 224
         video_height_crop = self.crop_size
         video_width_crop = self.crop_size
-
-        # if flag == 1, use the global sparse: random pick {self.frame_num} consecutive frames, return a list
-        # else use the local sparse: select all frames by {self.frame_num} frames a chunk, return a 2-dim list
-        flag = random.randint(0, 1)
         feature_3D = np.load(temporal_feat_name+'.npy')
         feature_3D = torch.from_numpy(feature_3D)
         frame_len=len(os.listdir(img_path_name))
         count=int(frame_len/self.frame_num)
-
-        
         final_trans_img = torch.zeros([self.frame_num,video_channel,video_height_crop,video_width_crop])
         final_spa = torch.zeros(self.frame_num,5*256)
         final_tem = []
-        
 
+        # if flag == 1, use the global sparse: random pick {self.frame_num} consecutive frames, return a list
+        # else use the local sparse: select all frames by {self.frame_num} frames a chunk, return a 2-dim list
+        flag = random.randint(0, 1)
         # local dense
         # select {self.frame_num} imgs with a interval
         if flag == 0:
@@ -127,7 +123,7 @@ class VideoDataset_train(data.Dataset):
         if len(final_spa) != self.frame_num:
             raise Exception('sample is not right')
         
-        return final_trans_img,  final_tem,  final_spa, video_score, flag
+        return final_trans_img,  final_tem,  final_spa, video_t_score,video_s_score
 
 
 class VideoDataset_val_test(data.Dataset):
@@ -138,74 +134,62 @@ class VideoDataset_val_test(data.Dataset):
                  database_name, crop_size, prompt_num, seed=0, frame_num=8):
         super(VideoDataset_val_test, self).__init__()
 
-        with open(mosfile_path, 'r') as f:
-            mos = json.load(f)
-        self.video_names = []
-        self.score = []
+        data_file=pd.read_csv(mosfile_path)
+        spa_file=data_file.iloc[:,3]
+        tem_file=data_file.iloc[:,4]
+        model_name=data_file.iloc[:,1]
+        
         random.seed(seed)
         np.random.seed(seed)
-
         index_rd = np.random.permutation(prompt_num)
-        val_index = index_rd[int(prompt_num * 0.7):int(prompt_num * 0.8)]
-        test_index = index_rd[int(prompt_num * 0.8):]
-        if database_name == 'val':
-            for idx, t2vmdl in enumerate(FETV_T2V_model):
-                for i in val_index:
-                    suffix = "{:03}".format(i)
-                    self.video_names.append(t2vmdl+suffix)
-                    self.score.append(mos[idx][i])
-        else:
-            for idx, t2vmdl in enumerate(FETV_T2V_model):
-                for i in test_index:
-                    suffix = "{:03}".format(i)
-                    self.video_names.append(t2vmdl+suffix)
-                    self.score.append(mos[idx][i])
-
-        dataInfo = pd.DataFrame(self.video_names)
-        dataInfo['score'] = self.score
-        dataInfo.columns = ['file_names', 'MOS']
-        self.video_names = dataInfo['file_names'].tolist()
-        self.score = dataInfo['MOS'].tolist()
+        train_index = index_rd[0:int(prompt_num*0.7)]
+        
+        self.img_path_dir=[]
+        self.s_feat_name=[]
+        self.t_feat_name=[]
+        self.t_score = []
+        self.s_score=[]
+        
+        for idx in train_index:
+            str_idx=str(idx)
+            idx_copy=idx
+            for j in range(4):
+                mdl=model_name[idx_copy]
+                # self.video_names.append(mdl+str_idx)
+                self.t_score.append(tem_file[idx_copy])
+                self.s_score.append(spa_file[idx_copy])
+                self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
+                self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
+                self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
+                idx_copy+=prompt_num
+        
         self.crop_size = crop_size
-        self.imgs_dir = imgs_dir
-        self.temporalFeat = temporalFeat
-        self.spatialFeat = spatialFeat
         self.transform = transform
-        self.length = len(self.video_names)
         self.frame_num = frame_num
-
     def __len__(self):
-        return self.length
+        return len(self.t_score)
 
     def __getitem__(self, idx):
 
-        video_name = self.video_names[idx]
-        t2vmodel_name = video_name[:-3]
-        # remove leading zeros
-        videoname_idx = int(video_name[-3:])
-        video_score = torch.FloatTensor(np.array(float(self.score[idx])))
-
-        img_path_name = os.path.join(
-            self.imgs_dir, t2vmodel_name, str(videoname_idx))
-        spatial_feat_name = os.path.join(
-            self.spatialFeat, t2vmodel_name, str(videoname_idx))
-        temporal_feat_name = os.path.join(
-            self.temporalFeat, t2vmodel_name, str(videoname_idx))
+        video_t_score = torch.FloatTensor(np.array(float(self.t_score[idx])))
+        video_s_score = torch.FloatTensor(np.array(float(self.s_score[idx])))
+        img_path_name = self.img_path_dir[idx]
+        spatial_feat_name = self.s_feat_name[idx]
+        temporal_feat_name = self.t_feat_name[idx] 
 
         video_channel = 3
-        # 224
         video_height_crop = self.crop_size
         video_width_crop = self.crop_size
-        frame_len = len(os.listdir(img_path_name))
-        count = int(frame_len/self.frame_num)        
+        feature_3D = np.load(temporal_feat_name+'.npy')
+        feature_3D = torch.from_numpy(feature_3D)
+        frame_len=len(os.listdir(img_path_name))
+        count=int(frame_len/self.frame_num)
 
         # test all clips of the video to get the average score
         # global sparse
         trans_img_glob = []
         spa_glob = []
         tem_glob = []
-        feature_3D = np.load(temporal_feat_name+'.npy')
-        feature_3D = torch.from_numpy(feature_3D)
         start_index = 0
         for i in range(count):
             trans_img = torch.zeros([self.frame_num, video_channel, video_height_crop, video_width_crop])
@@ -296,5 +280,5 @@ class VideoDataset_val_test(data.Dataset):
 
     #   return img0,img1,tem0,tem1,spa0,spa1,mos,count
         return trans_img_glob, trans_img_local, tem_glob, tem_local, \
-            spa_glob, spa_local, video_score, count
+            spa_glob, spa_local, video_t_score, video_s_score, count
 

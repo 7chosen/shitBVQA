@@ -31,6 +31,9 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         # 5*77
         self.joint_texts = torch.cat(
             [clip.tokenize(f'a photo with {q} quality' for q in qualitys)])
+        
+        self.spa_texts = torch.cat([clip.tokenize(f'a photo with {q} spatial quality' for q in qualitys)])
+        self.tem_texts = torch.cat([clip.tokenize(f'a photo with {q} tempotal quality' for q in qualitys)])
 
     def base_quality_regression(self, in_channels, middle_channels, out_channels):
         '''
@@ -101,74 +104,93 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         logit_scale = self.clip.logit_scale.exp()
 
         # Encode text features
-        text_features = self.clip.encode_text(self.joint_texts.to(x.device))
+        s_text_features = self.clip.encode_text(self.spa_texts.to(x.device))
+        t_text_features = self.clip.encode_text(self.tem_texts.to(x.device))
         # 5*512
 
         # Normalize text features
-        text_features = text_features / text_features.norm(dim=1, keepdim=True)
+        s_text_features = s_text_features / s_text_features.norm(dim=1, keepdim=True)
+        t_text_features = t_text_features / t_text_features.norm(dim=1, keepdim=True)
 
         # Compute cosine similarity as logits
         # (b_s*frame_num)*5
-        x = logit_scale * image_features @ text_features.t()
+        x_s = logit_scale * image_features @ s_text_features.t()
+        x_t = logit_scale * image_features @ t_text_features.t()
 
         # Apply softmax to logits
         # (batch * frame_num) * 5
-        x = torch.nn.functional.softmax(x, dim=1)
+        xs = torch.nn.functional.softmax(x_s, dim=1)
+        xt = torch.nn.functional.softmax(x_t, dim=1)
 
         # Weighted sum of outputs
         # Assuming you want to apply specific weights to the classes
-        x = 1 * x[:, 0] + 2 * x[:, 1] + 3 * x[:, 2] + 4 * x[:, 3] + 5 * x[:, 4]
+        xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
+        xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]
         # 1-dim (batch*frame_num)
 
-        x = x.view(x_size[0],-1)
+        xs = xs.view(x_size[0],-1)
+        xt = xt.view(x_size[0],-1)
         # batch*frame_num
-        x = torch.mean(x, dim=1).unsqueeze(1)  
+        xs = torch.mean(xs, dim=1).unsqueeze(1)  
+        xt = torch.mean(xt, dim=1).unsqueeze(1)  
         # batch*1
         
 
+        # spatial rectifier 
         if self.sr:
             lp_size = spa_feat.shape
             spa_feat = spa_feat.view(lp_size[0], -1)
             spatial = self.spatial_rec(spa_feat)
-            s_ones = torch.ones_like(x)  
+            s_ones = torch.ones_like(xs)  
             
             # ax+b
             sa = torch.chunk(spatial, 2, dim=1)[0]
             sa = torch.add(sa, s_ones)
             sb = torch.chunk(spatial, 2, dim=1)[1]
         else:
-            sa = torch.ones_like(x)
-            sb = torch.zeros_like(x)
-        qs = torch.add(torch.mul(torch.abs(sa), x), sb).squeeze(1)
+            sa = torch.ones_like(xs)
+            sb = torch.zeros_like(xs)
+        qs_s = torch.add(torch.mul(torch.abs(sa), xs), sb).squeeze(1)
+        qs_t = torch.add(torch.mul(torch.abs(sa), xt), sb).squeeze(1)
         # shape batch*(batch*frame_num)
 
+        # tempotal rectifier 
         if self.tr:
             x_3D_features_size = tem_feat.shape
             tem_feat = tem_feat.view(x_3D_features_size[0], -1)
             temporal = self.temporal_rec(tem_feat)
-            t_ones = torch.ones_like(x)  #
+            t_ones = torch.ones_like(xs)  #
             # ax+b
             ta = torch.chunk(temporal, 2, dim=1)[0]
             ta = torch.add(ta, t_ones)
             tb = torch.chunk(temporal, 2, dim=1)[1]
         else:
-            ta = torch.ones_like(x)
-            tb = torch.zeros_like(x)
-        qt = torch.add(torch.mul(torch.abs(ta), x), tb).squeeze(1)
+            ta = torch.ones_like(xs)
+            tb = torch.zeros_like(xs)
+        qt_s = torch.add(torch.mul(torch.abs(ta), xs), tb).squeeze(1)
+        qt_t = torch.add(torch.mul(torch.abs(ta), xt), tb).squeeze(1)
 
         if self.sr and self.tr:
             modular_a = torch.sqrt(torch.abs(torch.mul(sa, ta)))
             modular_b = torch.div(torch.add(sb, tb), 2)
-            qst = torch.add(torch.mul(modular_a, x), modular_b).squeeze(1)
-        elif self.sr:
-            qst = qs
-        elif self.tr:
-            qst = qt
+            qst_s = torch.add(torch.mul(modular_a, xs), modular_b).squeeze(1)
+            qst_t = torch.add(torch.mul(modular_a, xt), modular_b).squeeze(1)
+        # elif self.sr:
+            # qst = qs
+        # elif self.tr:
+            # qst = qt
         else:
+            raise Exception('haven\'t implement yet')
             qst = x.squeeze(1)
 
-
+        # x 2 qs 2 qt 2 qst 2
         # print(x.shape)
         # print(qs.shape)
         # print(qst.shape)
+        x=torch.concat((xs.unsqueeze(0),xt.unsqueeze(0)),dim=0)
+        qs=torch.concat((qs_s.unsqueeze(0),qs_t.unsqueeze(0)),dim=0)
+        qt=torch.concat((qt_s.unsqueeze(0),qt_t.unsqueeze(0)),dim=0)
+        qst=torch.concat((qst_s.unsqueeze(0),qst_t.unsqueeze(0)),dim=0)
+        
+        
         return x, qs, qt, qst
