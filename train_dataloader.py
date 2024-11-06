@@ -28,10 +28,12 @@ class VideoDataset_train(data.Dataset):
         super(VideoDataset_train, self).__init__()
 
         data_file=pd.read_csv(mosfile_path)
+        model_name=data_file.iloc[:,1]
+        prompt_file=data_file.iloc[:,2]
         spa_file=data_file.iloc[:,3]
         tem_file=data_file.iloc[:,4]
-        model_name=data_file.iloc[:,1]
-        
+        ali_file=data_file.iloc[:,5]
+
         random.seed(seed)
         np.random.seed(seed)
         index_rd = np.random.permutation(prompt_num)
@@ -40,17 +42,19 @@ class VideoDataset_train(data.Dataset):
         self.img_path_dir=[]
         self.s_feat_name=[]
         self.t_feat_name=[]
-        self.t_score = []
-        self.s_score=[]
+        self.prompt_name=[]
+
+        self.score=[]
         
         for idx in train_index:
             str_idx=str(idx)
             idx_copy=idx
             for j in range(4):
                 mdl=model_name[idx_copy]
-                # self.video_names.append(mdl+str_idx)
-                self.t_score.append(tem_file[idx_copy])
-                self.s_score.append(spa_file[idx_copy])
+
+                self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
+                self.prompt_name.append(prompt_file[idx_copy])
+                
                 self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
                 self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
                 self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
@@ -61,12 +65,16 @@ class VideoDataset_train(data.Dataset):
         self.frame_num = frame_num
 
     def __len__(self):
-        return len(self.t_score)
+        return len(self.score)
 
     def __getitem__(self, idx):
         
-        video_t_score = torch.FloatTensor(np.array(float(self.t_score[idx])))
-        video_s_score = torch.FloatTensor(np.array(float(self.s_score[idx])))
+        score=self.score[idx]
+        for ele in score:
+            ele=torch.FloatTensor(np.array(float(ele)))
+        prmt=self.prompt_name[idx]
+        # video_t_score = torch.FloatTensor(np.array(float(self.t_score[idx])))
+        # video_s_score = torch.FloatTensor(np.array(float(self.s_score[idx])))
         img_path_name = self.img_path_dir[idx]
         spatial_feat_name = self.s_feat_name[idx]
         temporal_feat_name = self.t_feat_name[idx] 
@@ -117,13 +125,12 @@ class VideoDataset_train(data.Dataset):
 
         # read 3D features
         # 1*256*frames*1*1 ->  self.frame_num*256
-        mid_value=feature_3D[:,:,random_range,:,:].squeeze().permute(1,0)
-        final_tem=mid_value
+        final_tem=feature_3D[:,:,random_range,:,:].squeeze().permute(1,0)
         
         if len(final_spa) != self.frame_num:
             raise Exception('sample is not right')
         
-        return final_trans_img,  final_tem,  final_spa, video_t_score,video_s_score
+        return final_trans_img,  final_tem,  final_spa, prmt, score
 
 
 class VideoDataset_val_test(data.Dataset):
@@ -142,27 +149,41 @@ class VideoDataset_val_test(data.Dataset):
         random.seed(seed)
         np.random.seed(seed)
         index_rd = np.random.permutation(prompt_num)
-        train_index = index_rd[0:int(prompt_num*0.7)]
-        
+        # train_index = index_rd[0:int(prompt_num*0.7)]
+        val_index = index_rd[int(prompt_num * 0.7):int(prompt_num * 0.8)]
+        test_index = index_rd[int(prompt_num * 0.8):]
         self.img_path_dir=[]
         self.s_feat_name=[]
         self.t_feat_name=[]
         self.t_score = []
         self.s_score=[]
         
-        for idx in train_index:
-            str_idx=str(idx)
-            idx_copy=idx
-            for j in range(4):
-                mdl=model_name[idx_copy]
-                # self.video_names.append(mdl+str_idx)
-                self.t_score.append(tem_file[idx_copy])
-                self.s_score.append(spa_file[idx_copy])
-                self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
-                self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
-                self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
-                idx_copy+=prompt_num
-        
+        if database_name == 'val':
+            for idx in val_index:
+                str_idx=str(idx)
+                idx_copy=idx
+                for j in range(4):
+                    mdl=model_name[idx_copy]
+                    self.t_score.append(tem_file[idx_copy])
+                    self.s_score.append(spa_file[idx_copy])
+                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
+                    self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
+                    self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
+                    idx_copy+=prompt_num
+        if database_name == 'test':
+            for idx in test_index:
+                str_idx=str(idx)
+                idx_copy=idx
+                for j in range(4):
+                    mdl=model_name[idx_copy]
+                    self.t_score.append(tem_file[idx_copy])
+                    self.s_score.append(spa_file[idx_copy])
+                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
+                    self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
+                    self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
+                    idx_copy+=prompt_num   
+
+                    
         self.crop_size = crop_size
         self.transform = transform
         self.frame_num = frame_num

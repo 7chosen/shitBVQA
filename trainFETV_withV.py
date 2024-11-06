@@ -25,8 +25,8 @@ def main(config):
 
     for loop in range(config.total_loop):
         config.exp_version = loop
-        print('%d round training starts here' % loop)
-        seed = loop * 1
+        print('the %dth round training starts here' % (loop) )
+        seed = loop 
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -82,13 +82,13 @@ def main(config):
         #             f.write("\n")
         # json.dump(tem,f,indent=4)
 
-        transformations_train = transforms.Compose(  # transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC)  transforms.Resize(config.resize)
+        transformations_train = transforms.Compose(
             [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),
              transforms.RandomCrop(config.crop_size),
              transforms.ToTensor(),
              transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
         transformations_vandt = transforms.Compose(
-            [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),  # transforms.Resize(config.resize),
+            [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),
              transforms.CenterCrop(config.crop_size),
              transforms.ToTensor(),
              transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
@@ -126,24 +126,30 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk_g, tem_feat_g, spa_feat_g, t_mos, s_mos) in enumerate(train_loader):
-
-                # x=len(list(filter(lambda i: i==0,flag)))
-                # print(f'this batch has {x} eles use local dense, total num is {len(flag)}')
+            for i, (vid_chunk, tem_feat, spa_feat, prmt, mos) in enumerate(train_loader):
 
                 optimizer.zero_grad()
-                labels = s_mos.to(device).float()
-                labelt = t_mos.to(device).float()
-                vid_chunk_g = vid_chunk_g.to(device)
-                tem_feat_g = tem_feat_g.to(device)
-                spa_feat_g = spa_feat_g.to(device)
+                label=[]
+                for i in range(len(mos)):
+                    label.append(mos[i].to(device).float())
+                    
+                # label = mos.to(device).float()
+                # labelt = mos[1].to(device).float()
+                
+                vid_chunk = vid_chunk.to(device)
+                tem_feat = tem_feat.to(device)
+                spa_feat = spa_feat.to(device)
+                # prmt.to(device)
+                
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
-                    tmidb, tmids, tmidt, tmidst = model(
-                        vid_chunk_g, tem_feat_g, spa_feat_g)
+                    _, _, _, sta = model(vid_chunk, tem_feat, spa_feat, prmt)
                     # loss = criterion(labels, outputs_st)
-                    loss_s= criterion(labels, tmidst[0])
-                    loss_t= criterion(labelt, tmidst[1])
-                    loss=(loss_s+loss_t)/2
+                    # loss_t= criterion(labelt[0], st[0])
+                    # loss_s= criterion(label[1], st[1])
+                    loss = 0
+                    for i in range(len(mos)):
+                        loss += criterion(label[i],sta[i])
+                    loss /= len(mos)
 
                 batch_losses.append(loss.item())
                 batch_losses_each_disp.append(loss.item())
@@ -186,8 +192,8 @@ def main(config):
                 Spa_y_s = np.zeros([len(valset)])
                 Spa_y_t = np.zeros([len(valset)])
                 Spa_y_st = np.zeros([len(valset)])
-                for i, (vid_chunk_g, vid_chunk_l, tem_feat_g, tem_feat_l,
-                        spa_feat_g, spa_feat_l, t_mos, s_mos,count) in enumerate(val_loader):
+                for i, (vid_chunk, vid_chunk_l, tem_feat, tem_feat_l,
+                        spa_feat, spa_feat_l, t_mos, s_mos,count) in enumerate(val_loader):
                     labelt[i] = t_mos.item()
                     labels[i] = s_mos.item()
                     tmidb = tmids = tmidt = tmidst = 0
@@ -196,10 +202,10 @@ def main(config):
 
 
                     for j in range(count):
-                        vid_chunk_g[j] = vid_chunk_g[j].to(device)
-                        tem_feat_g[j] = tem_feat_g[j].to(device)
-                        spa_feat_g[j] = spa_feat_g[j].to(device)
-                        b, s, t, st = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j])
+                        vid_chunk[j] = vid_chunk[j].to(device)
+                        tem_feat[j] = tem_feat[j].to(device)
+                        spa_feat[j] = spa_feat[j].to(device)
+                        b, s, t, st = model(vid_chunk[j], tem_feat[j], spa_feat[j])
 
                         smidb += b[0]
                         smids += s[0]
@@ -247,43 +253,69 @@ def main(config):
                     labelt, Tem_y_t)
                 tPLCC_st, tSRCC_st, tKRCC_st, tRMSE_st = performance_fit(
                     labelt, Tem_y_st)
+                sPLCC_b, sSRCC_b, sKRCC_b, sRMSE_b = performance_fit(
+                    labels, Spa_y_b)
+                sPLCC_s, sSRCC_s, sKRCC_s, sRMSE_s = performance_fit(
+                    labels, Spa_y_s)
+                sPLCC_t, sSRCC_t, sKRCC_t, sRMSE_t = performance_fit(
+                    labels, Spa_y_t)
+                sPLCC_st, sSRCC_st, sKRCC_st, sRMSE_st = performance_fit(
+                    labels, Spa_y_st)
 
+                print('===============Tem==============')
                 print(
                     'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                        epoch + 1,
-                        tSRCC_b, tKRCC_b, tPLCC_b, tRMSE_b))
+                        epoch + 1,tSRCC_b, tKRCC_b, tPLCC_b, tRMSE_b))
                 print(
                     'Epoch {} completed. The result on the S validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                        epoch + 1,
-                        tSRCC_s, tKRCC_s, tPLCC_s, tRMSE_s))
+                        epoch + 1,tSRCC_s, tKRCC_s, tPLCC_s, tRMSE_s))
                 print(
                     'Epoch {} completed. The result on the T validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                        epoch + 1,
-                        tSRCC_t, tKRCC_t, tPLCC_t, tRMSE_t))
+                        epoch + 1,tSRCC_t, tKRCC_t, tPLCC_t, tRMSE_t))
                 print(
                     'Epoch {} completed. The result on the ST validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                        epoch + 1,
-                        tSRCC_st, tKRCC_st, tPLCC_st, tRMSE_st))
-
+                        epoch + 1,tSRCC_st, tKRCC_st, tPLCC_st, tRMSE_st))
+                print('===============Spa==============')
+                print(
+                    'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                        epoch + 1,sSRCC_b, sKRCC_b, sPLCC_b, sRMSE_b))
+                print(
+                    'Epoch {} completed. The result on the S validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                        epoch + 1,sSRCC_s, sKRCC_s, sPLCC_s, sRMSE_s))
+                print(
+                    'Epoch {} completed. The result on the T validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                        epoch + 1,sSRCC_t, sKRCC_t, sPLCC_t, sRMSE_t))
+                print(
+                    'Epoch {} completed. The result on the ST validation databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                        epoch + 1,sSRCC_st, sKRCC_st, sPLCC_st, sRMSE_st))
         # ===================
         # save model
-                if tSRCC_st > best_val_criterion:
+                if (tSRCC_st+sSRCC_st)/2 > best_val_criterion:
                     print(
                         "Update best model using best_val_criterion in epoch {}".format(epoch + 1))
-                    best_val_criterion = tSRCC_st
+                    best_val_criterion = (tSRCC_st+sSRCC_st)/2
                     best_val_b = [tSRCC_b, tKRCC_b,
-                                  tPLCC_b, tRMSE_b]
+                                  tPLCC_b, tRMSE_b,
+                                  sSRCC_b,sKRCC_b,
+                                  sPLCC_b,sRMSE_b]
                     best_val_s = [tSRCC_s, tKRCC_s,
-                                  tPLCC_s, tRMSE_s]
+                                  tPLCC_s, tRMSE_s,
+                                  sSRCC_s,sKRCC_s,
+                                  sPLCC_s,sRMSE_s]
                     best_val_t = [tSRCC_t, tKRCC_t,
-                                  tPLCC_t, tRMSE_t]
+                                  tPLCC_t, tRMSE_t,
+                                  sSRCC_t,sKRCC_t,
+                                  sPLCC_t,sRMSE_t]
                     best_val_st = [tSRCC_st, tKRCC_st,
-                                   tPLCC_st, tRMSE_st]
+                                   tPLCC_st, tRMSE_st,
+                                   sSRCC_st,sKRCC_st,
+                                    sPLCC_st,sRMSE_st]
 
                     print('Saving model...')
-                    torch.save(model.state_dict(), f'ckpts_modular/{loop}.pth')
+                    torch.save(model.state_dict(), f'ckpts_modular/{loop}_{epoch}.pth')
 
-        print('Training completed.')
+        print('Training completed.')    
+        print('===============BSET tem==============')
 
         print(
             'The best training result on the base validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
@@ -301,6 +333,22 @@ def main(config):
             'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                 best_val_st[0], best_val_st[1], best_val_st[2], best_val_st[3]))
 
+        print('===============BSET spa==============')
+        print(
+            'The best training result on the base validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                best_val_b[4], best_val_b[5], best_val_b[6], best_val_b[7]))
+
+        print(
+            'The best training result on the S validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                best_val_s[4], best_val_s[5], best_val_s[6], best_val_s[7]))
+
+        print(
+            'The best training result on the T validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                best_val_t[4], best_val_t[5], best_val_t[6], best_val_t[7]))
+
+        print(
+            'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                best_val_st[4], best_val_st[5], best_val_st[6], best_val_st[7]))
         # data = {"b":best_val_b,
         #         "s":best_val_s,
         #         "t":best_val_t,
@@ -337,13 +385,12 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=30)
 
     # misc
-    # parser.add_argument('--t2vmodel',type=str,default=['cogvideo',''])
     parser.add_argument('--ckpt_path', type=str, default=None)
     parser.add_argument('--multi_gpu', action='store_true')
     parser.add_argument('--gpu_ids', type=list, default=None)
     parser.add_argument('--loss_type', type=str, default='plcc')
     parser.add_argument('--trained_model', type=str, default='none')
-    parser.add_argument('--save_path', type=str)
+    # parser.add_argument('--save_path', type=str)
     parser.add_argument('--mosfile', type=str,
                         default='data/FETV.csv')
 

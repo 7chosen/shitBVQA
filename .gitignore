@@ -4,3 +4,4 @@ ckpts_modular/
 *__pycache__
 logs/
 expri.py
+model/modular_copy.py

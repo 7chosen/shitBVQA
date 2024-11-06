@@ -54,64 +54,106 @@ def main(config):
 
     with torch.no_grad():
         model.eval()
-
-        label = np.zeros([len(testset)])
-        y_output_b = np.zeros([len(testset)])
-        y_output_s = np.zeros([len(testset)])
-        y_output_t = np.zeros([len(testset)])
-        y_output_st = np.zeros([len(testset)])
-        for i, (vid_chunk_g, vid_chunk_l, tem_g, tem_l,
-                spa_g, spa_l, mos, count) in enumerate(test_loader):
-            outputs_b = outputs_s = outputs_t = outputs_st = 0
-            label[i] = mos.item()
+        labelt = np.zeros([len(testset)])
+        labels = np.zeros([len(testset)])
+        Tem_y_b = np.zeros([len(testset)])
+        Tem_y_s = np.zeros([len(testset)])
+        Tem_y_t = np.zeros([len(testset)])
+        Tem_y_st = np.zeros([len(testset)])
+        Spa_y_b = np.zeros([len(testset)])
+        Spa_y_s = np.zeros([len(testset)])
+        Spa_y_t = np.zeros([len(testset)])
+        Spa_y_st = np.zeros([len(testset)])
+    
+        for i, (vid_chunk_g, vid_chunk_l, tem_feat_g, tem_feat_l,
+                spa_feat_g, spa_feat_l, t_mos, s_mos,count) in enumerate(test_loader):
+            labelt[i] = t_mos.item()
+            labels[i] = s_mos.item()
+            tmidb = tmids = tmidt = tmidst = 0
+            smidb = smids = smidt = smidst = 0
+            
             for j in range(count):
                 vid_chunk_g[j] = vid_chunk_g[j].to(device)
-                tem_g[j] = tem_g[j].to(device)
-                spa_g[j] = spa_g[j].to(device)
-                b, s, t, st = model(vid_chunk_g[j], tem_g[j], spa_g[j])
-                outputs_b += b
-                outputs_s += s
-                outputs_t += t
-                outputs_st += st
-                # print(f'testing... current count is {j}, the ret is {st}')
-            count = count.to(device)
-            outputs_b, outputs_s, outputs_t, outputs_st = \
-                outputs_b/count, outputs_s/count, outputs_t/count, outputs_st/count
+                tem_feat_g[j] = tem_feat_g[j].to(device)
+                spa_feat_g[j] = spa_feat_g[j].to(device)
+                b, s, t, st = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j])
+
+                smidb += b[0]
+                smids += s[0]
+                smidt += t[0]
+                smidst += st[0]
+                tmidb += b[1]
+                tmids += s[1]
+                tmidt += t[1]
+                tmidst += st[1]
+
+            count=count.to(device)
+
+            tmidb, tmids, tmidt, tmidst = tmidb/count, tmids/count, tmidt/count, tmidst/count
+            smidb, smids, smidt, smidst = smidb/count, smids/count, smidt/count, smidst/count
 
             vid_chunk_l = vid_chunk_l.to(device)
-            tem_l = tem_l.to(device)
-            spa_l = spa_l.to(device)
-            # outputs_b,outputs_s,outputs_t,outputs_st=model(vid_chunk_l,tem_l,spa_l)
+            tem_feat_l = tem_feat_l.to(device)
+            spa_feat_l = spa_feat_l.to(device)
+            b1, s1, t1, st1 = model(
+                vid_chunk_l, tem_feat_l, spa_feat_l)
 
-            b1, s1, t1, st1 = model(vid_chunk_l, tem_l, spa_l)
-            outputs_b = (outputs_b + b1) / 2
-            outputs_s = (outputs_s + s1) / 2
-            outputs_t = (outputs_t + t1) / 2
-            outputs_st = (outputs_st + st1) / 2
+            tmidb = (tmidb + b1[1]) / 2
+            tmids = (tmids + s1[1]) / 2
+            tmidt = (tmidt + t1[1]) / 2
+            tmidst = (tmidst + st1[1]) / 2
+            smidb = (smidb + b1[0]) / 2
+            smids = (smids + s1[0]) / 2
+            smidt = (smidt + t1[0]) / 2
+            smidst = (smidst + st1[0]) / 2
 
-            y_output_b[i] = outputs_b.item()
-            y_output_s[i] = outputs_s.item()
-            y_output_t[i] = outputs_t.item()
-            y_output_st[i] = outputs_st.item()
+            Tem_y_b[i] = tmidb.item()
+            Tem_y_s[i] = tmids.item()
+            Tem_y_t[i] = tmidt.item()
+            Tem_y_st[i] = tmidst.item()
+            Spa_y_b[i] = smidb.item()
+            Spa_y_s[i] = smids.item()
+            Spa_y_t[i] = smidt.item()
+            Spa_y_st[i] = smidst.item()
 
-        test_PLCC_b, test_SRCC_b, test_KRCC_b, test_RMSE_b = performance_fit(
-            label, y_output_b)
-        test_PLCC_s, test_SRCC_s, test_KRCC_s, test_RMSE_s = performance_fit(
-            label, y_output_s)
-        test_PLCC_t, test_SRCC_t, test_KRCC_t, test_RMSE_t = performance_fit(
-            label, y_output_t)
-        test_PLCC_st, test_SRCC_st, test_KRCC_st, test_RMSE_st = performance_fit(
-            label, y_output_st)
+        tPLCC_b, tSRCC_b, tKRCC_b, tRMSE_b = performance_fit(
+            labelt, Tem_y_b)
+        tPLCC_s, tSRCC_s, tKRCC_s, tRMSE_s = performance_fit(
+            labelt, Tem_y_s)
+        tPLCC_t, tSRCC_t, tKRCC_t, tRMSE_t = performance_fit(
+            labelt, Tem_y_t)
+        tPLCC_st, tSRCC_st, tKRCC_st, tRMSE_st = performance_fit(
+            labelt, Tem_y_st)
+        sPLCC_b, sSRCC_b, sKRCC_b, sRMSE_b = performance_fit(
+            labels, Spa_y_b)
+        sPLCC_s, sSRCC_s, sKRCC_s, sRMSE_s = performance_fit(
+            labels, Spa_y_s)
+        sPLCC_t, sSRCC_t, sKRCC_t, sRMSE_t = performance_fit(
+            labels, Spa_y_t)
+        sPLCC_st, sSRCC_st, sKRCC_st, sRMSE_st = performance_fit(
+            labels, Spa_y_st)    
 
-        # print(config.database)
+        print('===============Tem==============')
         print('The result on the base test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-            test_SRCC_b, test_KRCC_b, test_PLCC_b, test_RMSE_b))
+                tSRCC_b, tKRCC_b, tPLCC_b, tRMSE_b))
         print('The result on the S test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-            test_SRCC_s, test_KRCC_s, test_PLCC_s, test_RMSE_s))
+                tSRCC_s, tKRCC_s, tPLCC_s, tRMSE_s))
         print('The result on the T test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-            test_SRCC_t, test_KRCC_t, test_PLCC_t, test_RMSE_t))
+                tSRCC_t, tKRCC_t, tPLCC_t, tRMSE_t))
         print('The result on the ST test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-            test_SRCC_st, test_KRCC_st, test_PLCC_st, test_RMSE_st))
+                tSRCC_st, tKRCC_st, tPLCC_st, tRMSE_st))
+        print('===============Spa==============')
+        print('The result on the base test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                sSRCC_b, sKRCC_b, sPLCC_b, sRMSE_b))
+        print('The result on the S test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                sSRCC_s, sKRCC_s, sPLCC_s, sRMSE_s))
+        print('The result on the T test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                sSRCC_t, sKRCC_t, sPLCC_t, sRMSE_t))
+        print('The result on the ST test databaset: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                sSRCC_st, sKRCC_st, sPLCC_st, sRMSE_st))
+        
+        
+        
 
 
 if __name__ == '__main__':
@@ -127,14 +169,14 @@ if __name__ == '__main__':
 
     # misc
     parser.add_argument('--trained_model', type=str,
-                        default='ckpts_modular/first_train.pth')
+                        default='ckpts_modular/0_29.pth')
     parser.add_argument('--multi_gpu', action='store_true')
     parser.add_argument('--gpu_ids', type=list, default=None)
     parser.add_argument('--resize', type=int, default=256)
     parser.add_argument('--crop_size', type=int, default=224)
     parser.add_argument('--mosfile', type=str,
-                        default='data/pyIQA_FETV_score/mosFile/temAVGmos.json')
-    parser.add_argument('--seed', type=int)
+                        default='data/FETV.csv')
+    parser.add_argument('--seed', type=int,default=0)
 
     config = parser.parse_args()
 
