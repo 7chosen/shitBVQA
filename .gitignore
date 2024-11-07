@@ -3,5 +3,4 @@ ckpts_modular/
 .vscode/
 *__pycache__
 logs/
-expri.py
-model/modular_copy.py
+trash/

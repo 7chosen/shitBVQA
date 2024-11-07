@@ -12,12 +12,7 @@ import numpy as np
 import scipy.io as scio
 import math
 # from random import shuffle
-from config import FETV_T2V_model
-
-
-def read_float_with_comma(num):
-    return float(num.replace(",", "."))
-
+# from config import FETV_T2V_model
 
 class VideoDataset_train(data.Dataset):
     """Read data from the original dataset for feature extraction
@@ -43,7 +38,6 @@ class VideoDataset_train(data.Dataset):
         self.s_feat_name=[]
         self.t_feat_name=[]
         self.prompt_name=[]
-
         self.score=[]
         
         for idx in train_index:
@@ -142,21 +136,23 @@ class VideoDataset_val_test(data.Dataset):
         super(VideoDataset_val_test, self).__init__()
 
         data_file=pd.read_csv(mosfile_path)
+        model_name=data_file.iloc[:,1]
+        prompt_file=data_file.iloc[:,2]
         spa_file=data_file.iloc[:,3]
         tem_file=data_file.iloc[:,4]
-        model_name=data_file.iloc[:,1]
+        ali_file=data_file.iloc[:,5]
         
         random.seed(seed)
         np.random.seed(seed)
         index_rd = np.random.permutation(prompt_num)
-        # train_index = index_rd[0:int(prompt_num*0.7)]
         val_index = index_rd[int(prompt_num * 0.7):int(prompt_num * 0.8)]
         test_index = index_rd[int(prompt_num * 0.8):]
+
         self.img_path_dir=[]
         self.s_feat_name=[]
         self.t_feat_name=[]
-        self.t_score = []
-        self.s_score=[]
+        self.prompt_name=[]
+        self.score=[]
         
         if database_name == 'val':
             for idx in val_index:
@@ -164,20 +160,23 @@ class VideoDataset_val_test(data.Dataset):
                 idx_copy=idx
                 for j in range(4):
                     mdl=model_name[idx_copy]
-                    self.t_score.append(tem_file[idx_copy])
-                    self.s_score.append(spa_file[idx_copy])
+                    self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
+                    self.prompt_name.append(prompt_file[idx_copy])
+
                     self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
                     self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
                     self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
                     idx_copy+=prompt_num
+                    
         if database_name == 'test':
             for idx in test_index:
                 str_idx=str(idx)
                 idx_copy=idx
                 for j in range(4):
                     mdl=model_name[idx_copy]
-                    self.t_score.append(tem_file[idx_copy])
-                    self.s_score.append(spa_file[idx_copy])
+                    self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
+                    self.prompt_name.append(prompt_file[idx_copy])
+
                     self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
                     self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
                     self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
@@ -187,13 +186,18 @@ class VideoDataset_val_test(data.Dataset):
         self.crop_size = crop_size
         self.transform = transform
         self.frame_num = frame_num
+        
     def __len__(self):
-        return len(self.t_score)
+        return len(self.score)
 
     def __getitem__(self, idx):
 
-        video_t_score = torch.FloatTensor(np.array(float(self.t_score[idx])))
-        video_s_score = torch.FloatTensor(np.array(float(self.s_score[idx])))
+        score=self.score[idx]
+        for ele in score:
+            ele=torch.FloatTensor(np.array(float(ele)))
+        prmt=self.prompt_name[idx]
+        
+        
         img_path_name = self.img_path_dir[idx]
         spatial_feat_name = self.s_feat_name[idx]
         temporal_feat_name = self.t_feat_name[idx] 
@@ -287,7 +291,7 @@ class VideoDataset_val_test(data.Dataset):
             mid_value1=self.transform(mid_value1)
             trans_img_local[idx]=mid_value1
             mid_value3 = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)    
-            spa_local[idx]=mid_value3
+            spa_local[idx] = mid_value3
 
         # ========
         
@@ -301,5 +305,5 @@ class VideoDataset_val_test(data.Dataset):
 
     #   return img0,img1,tem0,tem1,spa0,spa1,mos,count
         return trans_img_glob, trans_img_local, tem_glob, tem_local, \
-            spa_glob, spa_local, video_t_score, video_s_score, count
+            spa_glob, spa_local, score, count, prmt
 

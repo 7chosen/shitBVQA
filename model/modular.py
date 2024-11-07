@@ -7,7 +7,7 @@ qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
 
 
 class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
-    def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2, dropout_ap=0.2):
+    def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
         super(ViTbCLIP_SpatialTemporal_dropout, self).__init__()
         ViT_B_16, _ = clip.load("ViT-B/16")
 
@@ -18,14 +18,14 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         self.feat_len = feat_len
         self.dropout_sp = dropout_sp
         self.dropout_tp = dropout_tp
-        self.dropout_ap = dropout_ap
 
-        self.base_quality = self.base_quality_regression(512, 128, 1)
-        self.spatial_rec_s = self.spatial_rectifier(5*256*self.feat_len, self.dropout_sp)
-        self.spatial_rec_t = self.spatial_rectifier(5*256*self.feat_len, self.dropout_sp)
+        self.spatialRec1 = self.spatial_rectifier(5*256*self.feat_len, self.dropout_sp)
+        self.spatialRec2 = self.spatial_rectifier(5*256*self.feat_len, self.dropout_sp)
+        self.spatialRec3 = self.spatial_rectifier(5*256*self.feat_len, self.dropout_sp)
 
-        self.temporal_rec_s = self.temporal_rectifier((256)*self.feat_len, self.dropout_tp)  # Fast:256  Slow:2048
-        self.temporal_rec_t = self.temporal_rectifier((256)*self.feat_len, self.dropout_tp)  # Fast:256  Slow:2048
+        self.temporalRec1 = self.temporal_rectifier((256)*self.feat_len, self.dropout_tp)  # Fast:256  Slow:2048
+        self.temporalRec2 = self.temporal_rectifier((256)*self.feat_len, self.dropout_tp)  # Fast:256  Slow:2048
+        self.temporalRec3 = self.temporal_rectifier((256)*self.feat_len, self.dropout_tp)  # Fast:256  Slow:2048
 
 
         self.sr = sr
@@ -34,17 +34,6 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         self.spa_texts = torch.cat([clip.tokenize(f'a photo with {q} spatial quality' for q in qualitys)])
         self.tem_texts = torch.cat([clip.tokenize(f'a photo with {q} temporal quality' for q in qualitys)])
 
-    def base_quality_regression(self, in_channels, middle_channels, out_channels):
-        '''
-        linear -> relu ->linear
-        512-1
-        '''
-        regression_block = nn.Sequential(
-            nn.Linear(in_channels, middle_channels),
-            nn.ReLU(),
-            nn.Linear(middle_channels, out_channels),
-        )
-        return regression_block
 
     def spatial_rectifier(self, in_channels, dropout_sp):
         '''
@@ -67,15 +56,6 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         )
         return regression_block
     
-    def alignment_rectifier(self, in_channels, dropout_ap):
-        regression_block = nn.Sequential(
-            nn.Linear(in_channels, 128),
-            nn.ReLU(),
-            nn.Linear(128, 2),
-            nn.Dropout(p=dropout_ap),
-        )
-        return regression_block
-
     def forward(self, x, tem_feat, spa_feat, prmt):
         x_size = x.shape
         # x: (batch * frames) x 3-channel x height x width
@@ -85,7 +65,7 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         # Using clip.text
         # input shape (batch_size*frame_num)*c*h*w, which h and w must be 224
         image_features = self.clip.encode_image(x)
-        # (batch_size*frame_num) * 512
+        # (batch_size*frame_num) * 51
 
         # Normalize image features
         image_features = image_features / image_features.norm(dim=1, keepdim=True)
@@ -122,8 +102,8 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         xs = xs.view(x_size[0],-1)
         xt = xt.view(x_size[0],-1)
         # batch*frame_num
-        xs = torch.mean(xs, dim=1).unsqueeze(1)  
-        xt = torch.mean(xt, dim=1).unsqueeze(1)  
+        xs = torch.mean(xs, dim=1).unsqueeze(1)
+        xt = torch.mean(xt, dim=1).unsqueeze(1)
         # batch*1
         
         
@@ -144,68 +124,78 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         if self.sr:
             lp_size = spa_feat.shape
             spa_feat = spa_feat.view(lp_size[0], -1)
-            spatial_s = self.spatial_rec_s(spa_feat)
-            spatial_t = self.spatial_rec_t(spa_feat)
+            spatial_s = self.spatialRec1(spa_feat)
+            spatial_t = self.spatialRec2(spa_feat)
+            spatial_a = self.spatialRec3(spa_feat)
             
             # ax+b
-            sa_s = torch.chunk(spatial_s, 2, dim=1)[0]
-            sa_s = torch.add(sa_s, ones)
-            sb_s = torch.chunk(spatial_s, 2, dim=1)[1]
+            alphaS1 = torch.chunk(spatial_s, 2, dim=1)[0]
+            alphaS1 = torch.add(alphaS1, ones)
+            betaS1 = torch.chunk(spatial_s, 2, dim=1)[1]
 
-            sa_t = torch.chunk(spatial_t, 2, dim=1)[0]
-            sa_t = torch.add(sa_t, ones)
-            sb_t = torch.chunk(spatial_t, 2, dim=1)[1]
-            
+            alphaS2 = torch.chunk(spatial_t, 2, dim=1)[0]
+            alphaS2 = torch.add(alphaS2, ones)
+            betaS2 = torch.chunk(spatial_t, 2, dim=1)[1]
+
+            alphaS3 = torch.chunk(spatial_a, 2, dim=1)[0]
+            alphaS3 = torch.add(alphaS3, ones)
+            betaS3 = torch.chunk(spatial_a, 2, dim=1)[1]           
         else:
-
             raise Exception('not implement')
             sa = torch.ones_like(xs)
             sb = torch.zeros_like(xs)
-        qs_s = torch.add(torch.mul(torch.abs(sa_s), xs), sb_s).squeeze(1)
-        qs_t = torch.add(torch.mul(torch.abs(sa_t), xt), sb_t).squeeze(1)
+        qs_s = torch.add(torch.mul(torch.abs(alphaS1), xs), betaS1).squeeze(1)
+        qs_t = torch.add(torch.mul(torch.abs(alphaS2), xt), betaS2).squeeze(1)
+        qs_a = torch.add(torch.mul(torch.abs(alphaS3), xa), betaS3).squeeze(1)
         # shape batch*(batch*frame_num)
 
         # tempotal rectifier 
         if self.tr:
             x_3D_features_size = tem_feat.shape
             tem_feat = tem_feat.view(x_3D_features_size[0], -1)
-            temporal_s = self.temporal_rec_s(tem_feat)
-            temporal_t = self.temporal_rec_t(tem_feat)
+            temporal_s = self.temporalRec1(tem_feat)
+            temporal_t = self.temporalRec2(tem_feat)
+            temporal_a = self.temporalRec3(tem_feat)
+
             # ax+b
-            ta_s= torch.chunk(temporal_s, 2, dim=1)[0]
-            ta_s = torch.add(ta_s, ones)
-            tb_s = torch.chunk(temporal_s, 2, dim=1)[1]
+            alphaT1= torch.chunk(temporal_s, 2, dim=1)[0]
+            alphaT1 = torch.add(alphaT1, ones)
+            betaT1 = torch.chunk(temporal_s, 2, dim=1)[1]
 
             
-            ta_t= torch.chunk(temporal_t, 2, dim=1)[0]
-            ta_t = torch.add(ta_t, ones)
-            tb_t = torch.chunk(temporal_t, 2, dim=1)[1]
+            alphaT2= torch.chunk(temporal_t, 2, dim=1)[0]
+            alphaT2 = torch.add(alphaT2, ones)
+            betaT2 = torch.chunk(temporal_t, 2, dim=1)[1]
+
+            alphaT3= torch.chunk(temporal_a, 2, dim=1)[0]
+            alphaT3 = torch.add(alphaT3, ones)
+            betaT3 = torch.chunk(temporal_a, 2, dim=1)[1]           
+
         else:
             raise Exception('not implement')
             ta = torch.ones_like(xs)
             tb = torch.zeros_like(xs)
-        qt_s = torch.add(torch.mul(torch.abs(ta_s), xs), tb_s).squeeze(1)
-        qt_t = torch.add(torch.mul(torch.abs(ta_t), xt), tb_t).squeeze(1)
-
-        
-
+        qt_s = torch.add(torch.mul(torch.abs(alphaT1), xs), betaT1).squeeze(1)
+        qt_t = torch.add(torch.mul(torch.abs(alphaT2), xt), betaT2).squeeze(1)
+        qt_a = torch.add(torch.mul(torch.abs(alphaT3), xa), betaT3).squeeze(1)
 
 
         if self.sr and self.tr:
-            modular_a_s = torch.sqrt(torch.abs(torch.mul(sa_s, ta_s)))
-            modular_b_s = torch.div(torch.add(sb_s, tb_s), 2)
+            st_a1 = torch.sqrt(torch.abs(torch.mul(alphaS1, alphaT1)))
+            st_b1 = torch.div(torch.add(betaS1, betaT1), 2)
 
-            modular_a_a = torch.sqrt(torch.abs(torch.mul(sa_s, ta_s)))
-            
-            modular_a_t = torch.sqrt(torch.abs(torch.mul(sa_t, ta_t)))
-            modular_b_t = torch.div(torch.add(sb_t, tb_t), 2)
+            st_a2 = torch.sqrt(torch.abs(torch.mul(alphaS2, alphaT2)))
+            st_b2 = torch.div(torch.add(betaS2, betaT2), 2)
 
+            st_a3 = torch.sqrt(torch.abs(torch.mul(alphaS3, alphaT3)))
+            st_b3 = torch.div(torch.add(betaS3, betaT3), 2)
             # modular_a_a = torch.sqrt(torch.abs(torch.mul(sa_t, ta_t)))
 
             
-            qst_s = torch.add(torch.mul(modular_a_s, xs), modular_b_s).squeeze(1)
-            qst_t = torch.add(torch.mul(modular_a_t, xt), modular_b_t).squeeze(1)
-            # qst_a = torch.add(torch.mul(modular_a_a, xa), modular_b_a).squeeze(1)
+            qst_s = torch.add(torch.mul(st_a1, xs), st_b1).squeeze(1)
+            qst_t = torch.add(torch.mul(st_a2, xt), st_b2).squeeze(1)
+            qst_a = torch.add(torch.mul(st_a3, xa), st_b3).squeeze(1)
+
 
         # elif self.sr:
             # qst = qs
@@ -215,11 +205,16 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
             raise Exception('haven\'t implement yet')
             qst = x.squeeze(1)
 
-        x=torch.concat((xt.unsqueeze(0),xs.unsqueeze(0),xa.unsqueeze(0)),dim=0)
-        qt=torch.concat((qt_t.unsqueeze(0),qt_s.unsqueeze(0)),dim=0)
-        qs=torch.concat((qs_t.unsqueeze(0),qs_s.unsqueeze(0)),dim=0)
-         
-        qst=torch.concat((qst_t.unsqueeze(0),qst_s.unsqueeze(0)),dim=0)
+        # x=torch.concat((xt.unsqueeze(0),xs.unsqueeze(0),xa.unsqueeze(0)),dim=0)
+        # qt=torch.concat((qt_t.unsqueeze(0),qt_s.unsqueeze(0),qt_a.unsqueeze(0)),dim=0)
+        # qs=torch.concat((qs_t.unsqueeze(0),qs_s.unsqueeze(0),qs_a.unsqueeze(0)),dim=0)
+        # qst=torch.concat((qst_t.unsqueeze(0),qst_s.unsqueeze(0),qst_a.unsqueeze(0)),dim=0)
+
+
+        # 4 * batch_size 
+        t=torch.stack((xt.squeeze(1),qt_t,qs_t,qst_t))
+        s=torch.stack((xs.squeeze(1),qt_s,qs_s,qst_s))
+        a=torch.stack((xa.squeeze(1),qt_a,qs_a,qst_a))
         
-        
-        return x, qt, qs, qst
+        # return x, qt, qs, qst
+        return t, s, a

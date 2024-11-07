@@ -11,13 +11,13 @@ import torch.optim as optim
 # import csv
 import torch.nn as nn
 import random
-from train_dataloader import VideoDataset_train, VideoDataset_val_test
+from ali_dt import VideoDataset_train, VideoDataset_val_test
 from utils import performance_fit
 from utils import plcc_loss, plcc_rank_loss
 
 from torchvision import transforms
 import time
-from model import modular
+from trash import modularALI
 from torch.amp import GradScaler
 # from config import T2V_model
 
@@ -34,7 +34,7 @@ def main(config):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if config.model_name == 'ViTbCLIP_SpatialTemporal_dropout':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=config.feat_len)
+            model = modularALI.ViTbCLIP_SpatialTemporal_dropout(feat_len=config.feat_len,sr=False,tr=False)
 
         print('The current model is ' + config.model_name)
 
@@ -129,28 +129,21 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk, tem_feat, spa_feat, prmt, mos) in enumerate(train_loader):
+            for i, (vid_chunk, prmt, mos) in enumerate(train_loader):
 
                 optimizer.zero_grad()
-                label=[]
-                for i in range(len(mos)):
-                    label.append(mos[i].to(device).float())
-                    
+                label=mos.to(device).float()                    
                 # label = mos.to(device).float()
                 # labelt = mos[1].to(device).float()
                 
                 vid_chunk = vid_chunk.to(device)
-                tem_feat = tem_feat.to(device)
-                spa_feat = spa_feat.to(device)
                 # prmt.to(device)
                 
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
-                    t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt)
+                    a = model(vid_chunk,prmt)
 
-                    loss = criterion(label[0],t[3]) \
-                        +criterion(label[1],s[3]) \
-                        +criterion(label[2],a[3])
-                    loss /= len(mos)
+                    loss = criterion(label,a)
+                    # loss /= len(mos)
 
                 batch_losses.append(loss.item())
                 batch_losses_each_disp.append(loss.item())
@@ -188,8 +181,8 @@ def main(config):
                 Spa_y = np.zeros([len(valset),4])
                 Ali_y = np.zeros([len(valset),4])
                 
-                for i, (vid_chunk, vid_chunk_l, tem_feat, tem_feat_l,\
-                    spa_feat, spa_feat_l, mos,count, prmt) in enumerate(val_loader):
+                for i, (vid_chunk, vid_chunk_l, tem_feat, tem_feat_l,
+                        spa_feat, spa_feat_l, mos,count, prmt) in enumerate(val_loader):
 
                     for j in range(len(mos)):
                         label[i][j] = mos[j].item()
@@ -263,32 +256,32 @@ def main(config):
                 print('===============Tem==============')
                     
                 print(
-                    'Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_b))
+                    'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}'.format(epoch + 1,tSRCC_b))
                 print(
-                    'Epoch {} completed. S val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_s))
+                    'Epoch {} completed. The result on the S validation databaset: SRCC: {:.4f}'.format(epoch + 1,tSRCC_s))
                 print(
-                    'Epoch {} completed. T val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_t))
+                    'Epoch {} completed. The result on the T validation databaset: SRCC: {:.4f}'.format(epoch + 1,tSRCC_t))
                 print(
-                    'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_st))
+                    'Epoch {} completed. The result on the ST validation databaset: SRCC: {:.4f}'.format(epoch + 1,tSRCC_st))
                 print('===============Spa==============')
                 print(
-                    'Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_b))
+                    'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}'.format(epoch + 1,sSRCC_b))
                 print(
-                    'Epoch {} completed. S val: SRCC: {:.4f}'.format( epoch + 1,sSRCC_s))
+                    'Epoch {} completed. The result on the S validation databaset: SRCC: {:.4f}'.format( epoch + 1,sSRCC_s))
                 print(
-                    'Epoch {} completed. T val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_t))
+                    'Epoch {} completed. The result on the T validation databaset: SRCC: {:.4f}'.format(epoch + 1,sSRCC_t))
                 print(
-                    'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_st))
+                    'Epoch {} completed. The result on the ST validation databaset: SRCC: {:.4f}'.format(epoch + 1,sSRCC_st))
 
                 print('===============Ali==============')
                 print(
-                    'Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_b))
+                    'Epoch {} completed. The result on the base validation databaset: SRCC: {:.4f}'.format(epoch + 1,aSRCC_b))
                 print(
-                    'Epoch {} completed. S val: SRCC: {:.4f}'.format( epoch + 1,aSRCC_s))
+                    'Epoch {} completed. The result on the S validation databaset: SRCC: {:.4f}'.format( epoch + 1,aSRCC_s))
                 print(
-                    'Epoch {} completed. T val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_t))
+                    'Epoch {} completed. The result on the T validation databaset: SRCC: {:.4f}'.format(epoch + 1,aSRCC_t))
                 print(
-                    'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_st))
+                    'Epoch {} completed. The result on the ST validation databaset: SRCC: {:.4f}'.format(epoch + 1,aSRCC_st))
                     
                 
                 
