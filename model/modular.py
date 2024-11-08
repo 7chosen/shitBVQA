@@ -58,17 +58,29 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
     
     def forward(self, x, tem_feat, spa_feat, prmt):
         x_size = x.shape
-        # x: (batch * frames) x 3-channel x height x width
-        # eg. 128*3*224*224
-        x = x.view(-1, x_size[2], x_size[3], x_size[4])
+        # x: batch * frames x 3-channel x height x width
+        # eg. 16*8*3*224*224
+        
+        # b_s * 512
+        image_features=torch.zeros([x_size[0],512])
+        for i in range(x_size[0]):
+            
+            mid=self.clip.encode_image(x[i])
+            # frames*512
+            mid=mid/mid.norm(dim=1,keepdim=True)
+            image_features[i]=torch.mean(mid,dim=0)
+        image_features=image_features.to(x.device)
+            
+        # x = x.view(-1, x_size[2], x_size[3], x_size[4])
 
         # Using clip.text
         # input shape (batch_size*frame_num)*c*h*w, which h and w must be 224
-        image_features = self.clip.encode_image(x)
-        # (batch_size*frame_num) * 51
+        # image_features = self.clip.encode_image(x)
+        # (batch_size*frame_num) * 512
 
         # Normalize image features
-        image_features = image_features / image_features.norm(dim=1, keepdim=True)
+        # image_features = image_features / image_features.norm(dim=1, keepdim=True)
+        # image_features=torch.mean(image_features,dim=0,keepdim=True)
 
         # Get logit scale
         logit_scale = self.clip.logit_scale.exp()
@@ -76,44 +88,40 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         # Encode text features
         s_text_features = self.clip.encode_text(self.spa_texts.to(x.device))
         t_text_features = self.clip.encode_text(self.tem_texts.to(x.device))   
-        # 5*512
+        # 5 * 512
 
         # Normalize text features
         s_text_features = s_text_features / s_text_features.norm(dim=1, keepdim=True)
         t_text_features = t_text_features / t_text_features.norm(dim=1, keepdim=True)
 
         # Compute cosine similarity as logits
-        # (b_s*frame_num)*5
+        # b_s * 5
         x_s = logit_scale * image_features @ s_text_features.t()
         x_t = logit_scale * image_features @ t_text_features.t()
         # print(x_t.shape)
 
         # Apply softmax to logits
-        # (batch * frame_num) * 5
+        # batch * 5
         xs = torch.nn.functional.softmax(x_s, dim=1)
         xt = torch.nn.functional.softmax(x_t, dim=1)
+        # print(xt.shape)
 
         # Weighted sum of outputs
         # Assuming you want to apply specific weights to the classes
         xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
         xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]
-        # 1-dim (batch*frame_num)
+        # 1-dim batch
 
-        xs = xs.view(x_size[0],-1)
-        xt = xt.view(x_size[0],-1)
-        # batch*frame_num
-        xs = torch.mean(xs, dim=1).unsqueeze(1)
-        xt = torch.mean(xt, dim=1).unsqueeze(1)
+        xs = xt.unsqueeze(1)
+        xt = xt.unsqueeze(1)
         # batch*1
-        
         
         alignment = clip.tokenize(prmt).to(x.device)
         alignment = self.clip.encode_text(alignment)
         ali_feat = alignment / alignment.norm(dim=1,keepdim=True)
         ali_feat =logit_scale * image_features @ ali_feat.t()
-        ali_feat = ali_feat.view(x_size[0],-1)
-        # batch * 128
-        xa = torch.mean(ali_feat, dim=1).unsqueeze(1)
+        # batch * 16
+        xa = torch.mean(ali_feat, dim=1,keepdim=True)
         # batch*1
         
         assert xa.shape == xs.shape == xt.shape, "shape is not same"

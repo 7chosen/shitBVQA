@@ -14,7 +14,7 @@ def main(config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(device)
 
-    static = pd.read_csv('static_ret.csv')
+    static = pd.read_csv('logs/static_ret.csv')
 
     if config.model_name == 'ViTbCLIP_SpatialTemporal_modular_dropout':
         model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=8)
@@ -172,7 +172,7 @@ def main(config):
             'S val: SRCC: {:.4f}'.format(aSRCC_s))
         print(
             'ST val: SRCC: {:.4f}'.format(aSRCC_st))
-        static.to_csv('static_ret.csv',index=False)        
+        static.to_csv('logs/static_ret.csv',index=False)        
     
 
 

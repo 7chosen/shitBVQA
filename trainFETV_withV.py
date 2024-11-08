@@ -24,7 +24,7 @@ from torch.amp import GradScaler
 
 def main(config):
     
-    static = pd.read_csv('static.csv')
+    static = pd.read_csv('logs/static.csv')
     
     for loop in range(config.total_loop):
         config.exp_version = loop
@@ -119,7 +119,7 @@ def main(config):
                                                  shuffle=False, num_workers=config.num_workers)
 
         best_val_criterion = -1  # SROCC min
-        best_val_b, best_val_s, best_val_t, best_val_st = [], [], [], []
+        # best_val_b, best_val_s, best_val_t, best_val_st = [], [], [], []
 
         print('Starting training:')
 
@@ -133,8 +133,8 @@ def main(config):
 
                 optimizer.zero_grad()
                 label=[]
-                for i in range(len(mos)):
-                    label.append(mos[i].to(device).float())
+                for l in range(len(mos)):
+                    label.append(mos[l].to(device).float())
                     
                 # label = mos.to(device).float()
                 # labelt = mos[1].to(device).float()
@@ -142,7 +142,6 @@ def main(config):
                 vid_chunk = vid_chunk.to(device)
                 tem_feat = tem_feat.to(device)
                 spa_feat = spa_feat.to(device)
-                # prmt.to(device)
                 
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
                     t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt)
@@ -361,7 +360,7 @@ def main(config):
         print(
             'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
                 best_val_st[8], best_val_st[9], best_val_st[10], best_val_st[11]))
-        static.to_csv('static.csv',index=False)
+        static.to_csv('logs/static.csv',index=False)
 
         # data = {"b":best_val_b,
         #         "s":best_val_s,

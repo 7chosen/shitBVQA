@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import scipy.io as scio
-from config import T2V_model,LGVQ_T2V_model
+from config import FETV_T2V_model,LGVQ_T2V_model
 from PIL import Image
 import cv2
 
@@ -76,16 +76,16 @@ def extract_frame(video_path,save_folder):
 if __name__ == "__main__":
     
     # spa_feat_path='data/FETV_spatial_all_frames/'
-    save_folder='data/LGVQ_base_all_frames/'
-    video_path='/home/user/Documents/vqadata/LGVQ/videos/'
+    save_folder='test/'
+    video_path='/home/user/Documents/vqadata/FETV/'
     # if not os.path.exists(save_folder):
         # os.makedirs(save_folder)
-    for t2vmdl in LGVQ_T2V_model:
+    for t2vmdl in FETV_T2V_model:
         # if t2vmdl == 'cogvideo':
         #     pass
         print(f'========{t2vmdl}=========')
         # spa=spa_feat_path+t2vmdl
-        v_p=video_path+t2vmdl
+        v_p=video_path+t2vmdl+'/videos'
         s_f=save_folder+t2vmdl
         # extract_frame_spa(spa,v_p,s_f)
         
