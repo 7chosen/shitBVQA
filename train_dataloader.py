@@ -84,10 +84,10 @@ class VideoDataset_train(data.Dataset):
         final_spa = torch.zeros(self.frame_num,5*256)
         final_tem = []
 
-        # if flag == 1, use the global sparse: random pick {self.frame_num} consecutive frames, return a list
-        # else use the local sparse: select all frames by {self.frame_num} frames a chunk, return a 2-dim list
+        # if flag == 1, use the local sparse: random pick {self.frame_num} consecutive frames, return a list
+        # else use the global sparse: select all frames by {self.frame_num} frames a chunk, return a 2-dim list
         flag = random.randint(0, 1)
-        # local dense
+        # global dense
         # select {self.frame_num} imgs with a interval
         if flag == 0:
             # make sure it always select the first {self.frame_num} frames
@@ -103,7 +103,7 @@ class VideoDataset_train(data.Dataset):
                     np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
             
         # flage = 1, use random {self.frame_num} consecutive imgs
-        # global sparse
+        # local sparse
         else:
             frame_len = frame_len - 1
             start_index = random.randint(0, frame_len-self.frame_num)
@@ -211,10 +211,10 @@ class VideoDataset_val_test(data.Dataset):
         count=int(frame_len/self.frame_num)
 
         # test all clips of the video to get the average score
-        # global sparse
-        trans_img_glob = []
-        spa_glob = []
-        tem_glob = []
+        # local
+        img_l = []
+        s_l = []
+        t_l = []
         start_index = 0
         for i in range(count):
             trans_img = torch.zeros([self.frame_num, video_channel, video_height_crop, video_width_crop])
@@ -231,9 +231,9 @@ class VideoDataset_val_test(data.Dataset):
                     np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
             fast_feature = feature_3D[:, :, specified_rge, :, :]
             fast_feature = fast_feature.squeeze().permute(1, 0)
-            trans_img_glob.append(trans_img)
-            tem_glob.append(fast_feature)
-            spa_glob.append(lap_feat)
+            img_l.append(trans_img)
+            t_l.append(fast_feature)
+            s_l.append(lap_feat)
             start_index += self.frame_num
         if 0 < frame_len - start_index < self.frame_num:
             count += 1
@@ -251,9 +251,9 @@ class VideoDataset_val_test(data.Dataset):
                     np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
             fast_feature = feature_3D[:, :, -8:, :, :]
             fast_feature = fast_feature.squeeze().permute(1, 0)
-            trans_img_glob.append(trans_img)
-            tem_glob.append(fast_feature)
-            spa_glob.append(lap_feat)
+            img_l.append(trans_img)
+            t_l.append(fast_feature)
+            s_l.append(lap_feat)
 
         # test {self.frame_num} consecutive frames, a clip of the vid
         '''
@@ -275,35 +275,238 @@ class VideoDataset_val_test(data.Dataset):
         '''
 
         # test select {self.frame_num} frames with a interval T
-        # local dense
-        tem_local = torch.zeros([self.frame_num,256])
-        spa_local = torch.zeros([self.frame_num,256*5])
-        trans_img_local = torch.zeros([self.frame_num,video_channel,video_height_crop,video_width_crop])
+        # global 
+        t_g = torch.zeros([self.frame_num,256])
+        s_g = torch.zeros([self.frame_num,256*5])
+        img_g = torch.zeros([self.frame_num,video_channel,video_height_crop,video_width_crop])
         # make sure always select the first {self.frame_num} frames
         count2=int(frame_len/self.frame_num)
         frame_len=count2*self.frame_num
         fixed_range=list([x] for x in range(0,frame_len,count2))
         mid_value = feature_3D[:,:,fixed_range,:,:].squeeze().permute(1,0)
-        tem_local=mid_value
+        t_g=mid_value
         for idx,i in enumerate(range(0,frame_len,count2)):
             img_name = os.path.join(img_path_name,f'{i}.png')
             mid_value1=Image.open(img_name).convert('RGB')
             mid_value1=self.transform(mid_value1)
-            trans_img_local[idx]=mid_value1
+            img_g[idx]=mid_value1
             mid_value3 = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)    
-            spa_local[idx] = mid_value3
+            s_g[idx] = mid_value3
 
         # ========
         
-        if len(spa_glob) != count:
-            raise Exception('global sparse sample is not right')
+        if len(s_l) != count:
+            raise Exception('local sample is not right')
         
-        if len(spa_local) != self.frame_num:
-            print(len(spa_local))
+        if len(s_g) != self.frame_num:
+            print(len(s_g))
             print(self.frame_num)
-            raise Exception('local dense sample is not right')
+            raise Exception('global sample is not right')
 
     #   return img0,img1,tem0,tem1,spa0,spa1,mos,count
-        return trans_img_glob, trans_img_local, tem_glob, tem_local, \
-            spa_glob, spa_local, score, count, prmt
+        return img_l, img_g, t_l, t_g, \
+            s_l, s_g, score, count, prmt
 
+
+
+
+
+v_mean = np.array([0.485, 0.456, 0.406]).reshape(1,1,3)
+v_std = np.array([0.229, 0.224, 0.225]).reshape(1,1,3)
+def normalize(data):
+    return (data/255.0-v_mean)/v_std
+
+def frames2tensor(vid_list, fnum=8, target_size=(224, 224), device=torch.device('cuda')):
+    assert(len(vid_list) >= fnum)
+    # step = len(vid_list) // fnum
+    # vid_list = vid_list[::step][:fnum]
+    vid_list = [cv2.resize(x[:,:,::-1], target_size) for x in vid_list]
+    vid_tube = [np.expand_dims(normalize(x), axis=(0,1)) for x in vid_list]
+    vid_tube = np.concatenate(vid_tube, axis=1)
+    # print(vid_tube.shape)
+    vid_tube = np.transpose(vid_tube, (0, 1, 4, 2, 3))
+    vid_tube = torch.from_numpy(vid_tube).float()
+    vid_tube=vid_tube.squeeze(0)
+    return vid_tube
+
+
+class viCLIP_trainDT(data.Dataset):
+    """Read data from the original dataset for feature extraction
+    """
+
+    def __init__(self, imgs_dir, temporalFeat, spatialFeat, mosfile_path, transform,
+                 crop_size, prompt_num, frame_num=8, seed=0):
+        super(viCLIP_trainDT, self).__init__()
+
+        data_file=pd.read_csv(mosfile_path)
+        model_name=data_file.iloc[:,1]
+        prompt_file=data_file.iloc[:,2]
+        spa_file=data_file.iloc[:,3]
+        tem_file=data_file.iloc[:,4]
+        ali_file=data_file.iloc[:,5]
+
+        random.seed(seed)
+        np.random.seed(seed)
+        index_rd = np.random.permutation(prompt_num)
+        train_index = index_rd[0:int(prompt_num*0.7)]
+        
+        self.img_path_dir=[]
+        self.prompt_name=[]
+        self.score=[]
+        
+        for idx in train_index:
+            str_idx=str(idx)
+            idx_copy=idx
+            for j in range(4):
+                mdl=model_name[idx_copy]
+                self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
+                self.prompt_name.append(prompt_file[idx_copy])
+                self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
+                idx_copy+=prompt_num
+        
+        self.crop_size = crop_size
+        self.frame_num = frame_num
+
+    def __len__(self):
+        return len(self.score)
+
+    def __getitem__(self, idx):
+        
+        score=self.score[idx]
+        for ele in score:
+            ele=torch.FloatTensor(np.array(float(ele)))
+        prmt=self.prompt_name[idx]
+        img_path_name = self.img_path_dir[idx]
+        frame_len=len(os.listdir(img_path_name))
+        count=int(frame_len/self.frame_num)
+        # final_trans_img = torch.zeros([self.frame_num,video_channel,video_height_crop,video_width_crop])
+        final_trans_img=[]
+
+
+        # if flag == 1, use the local sparse: random pick {self.frame_num} consecutive frames
+        # else flag = 0 use the global sparse: select all frames by {self.frame_num} frames a chunk
+        flag = random.randint(0, 1)
+        # global dense
+        # select {self.frame_num} imgs with a interval
+        if flag == 0:
+            # make sure it always select the first {self.frame_num} frames
+            frame_len = self.frame_num * count
+            for idx,i in enumerate(range(0,frame_len,count)):
+                img_name = os.path.join(img_path_name, f'{i}.png')
+                read_frame = cv2.imread(img_name)
+                final_trans_img.append(read_frame)
+
+            
+        # flage = 1, use random {self.frame_num} consecutive imgs
+        # local sparse
+        else:
+            frame_len = frame_len - 1
+            start_index = random.randint(0, frame_len-self.frame_num)
+            for idx,i in enumerate(range(start_index, start_index + self.frame_num)):
+                img_name = os.path.join(img_path_name, f'{i}.png')
+                read_frame = cv2.imread(img_name)
+                final_trans_img.append(read_frame)
+
+        imgs=frames2tensor(final_trans_img) 
+        
+        
+        return imgs, prmt, score
+
+        
+class viCLIP_vandtDT(data.Dataset):
+    """Read data from the original dataset for feature extraction
+    """
+
+    def __init__(self, imgs_dir, mosfile_path,
+                 database_name,crop_size, prompt_num, frame_num=8, seed=0):
+        super(viCLIP_vandtDT, self).__init__()
+
+        data_file=pd.read_csv(mosfile_path)
+        model_name=data_file.iloc[:,1]
+        prompt_file=data_file.iloc[:,2]
+        spa_file=data_file.iloc[:,3]
+        tem_file=data_file.iloc[:,4]
+        ali_file=data_file.iloc[:,5]
+
+        random.seed(seed)
+        np.random.seed(seed)
+        index_rd = np.random.permutation(prompt_num)
+        val_index = index_rd[int(prompt_num * 0.7):int(prompt_num * 0.8)]
+        test_index = index_rd[int(prompt_num * 0.8):]
+        
+        self.img_path_dir=[]
+        self.prompt_name=[]
+        self.score=[]
+        
+        if database_name == 'val':
+            for idx in val_index:
+                str_idx=str(idx)
+                idx_copy=idx
+                for j in range(4):
+                    mdl=model_name[idx_copy]
+                    self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
+                    self.prompt_name.append(prompt_file[idx_copy])                    
+                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
+                    idx_copy+=prompt_num
+        if database_name == 'test':
+            for idx in test_index:
+                str_idx=str(idx)
+                idx_copy=idx
+                for j in range(4):
+                    mdl=model_name[idx_copy]
+                    self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
+                    self.prompt_name.append(prompt_file[idx_copy])                    
+                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
+                    idx_copy+=prompt_num
+        self.crop_size = crop_size
+        self.frame_num = frame_num
+
+    def __len__(self):
+        return len(self.score)
+
+    def __getitem__(self, idx):
+        
+        score=self.score[idx]
+        for ele in score:
+            ele=torch.FloatTensor(np.array(float(ele)))
+        prmt=self.prompt_name[idx]
+        img_path_name = self.img_path_dir[idx]
+        frame_len=len(os.listdir(img_path_name))
+        count=int(frame_len/self.frame_num)
+        # local
+        img_l=[]
+        start_idx=0
+
+        for i in range(count):
+            tem_img=[]
+            for j in range(start_idx,start_idx+self.frame_num):
+                img_name=os.path.join(img_path_name,f'{i}.png')
+                mid_value1=cv2.imread(img_name)
+                tem_img.append(mid_value1)
+            ret=frames2tensor(tem_img)
+            img_l.append(ret)
+            start_idx+=self.frame_num
+        if 0< frame_len-start_idx < self.frame_num:
+            count+=1
+            tem_img=[]
+            start_idx=frame_len-self.frame_num
+            for j in range(start_idx,frame_len):
+                img_name=os.path.join(img_path_name,f'{i}.png')
+                mid_value1=cv2.imread(img_name)
+                tem_img.append(mid_value1)
+            ret=frames2tensor(tem_img)
+            img_l.append(ret)
+
+
+        # global
+        img_g = []
+        count2=int(frame_len/self.frame_num)
+        frame_len=count2*self.frame_num
+        for idx,i in enumerate(range(0,frame_len,count2)):
+            img_name = os.path.join(img_path_name,f'{i}.png')
+            mid_value1=cv2.imread(img_name)
+            img_g.append(mid_value1)
+        img_g=frames2tensor(img_g) 
+        
+        
+        return img_l,img_g,prmt,score,count

@@ -5,8 +5,8 @@ import pandas as pd
 import torch
 import torch.nn
 from torchvision import transforms
-from model import modular
-from utils import performance_fit
+from modular_model import modular
+from modular_utils import performance_fit
 from train_dataloader import VideoDataset_val_test
 
 

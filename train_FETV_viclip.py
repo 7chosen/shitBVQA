@@ -1,25 +1,23 @@
 # -*- coding: utf-8 -*-
 import argparse
-# import json
 import json
 import os
-
 import numpy as np
 import pandas as pd
 import torch
 import torch.optim as optim
-# import csv
 import torch.nn as nn
 import random
-from train_dataloader import VideoDataset_train, VideoDataset_val_test
-from utils import performance_fit
-from utils import plcc_loss, plcc_rank_loss
-
+from train_dataloader import viCLIP_trainDT,viCLIP_vandtDT
+from modular_utils import performance_fit
+from modular_utils import plcc_loss, plcc_rank_loss
 from torchvision import transforms
 import time
 from model import modular
 from torch.amp import GradScaler
 # from config import T2V_model
+# from transformers import AutoModel
+from ViCLIP_models.viclip import ViCLIP
 
 
 def main(config):
@@ -35,6 +33,9 @@ def main(config):
 
         if config.model_name == 'ViTbCLIP_SpatialTemporal_dropout':
             model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=config.feat_len)
+        else:
+            model = ViCLIP()
+
 
         print('The current model is ' + config.model_name)
 
@@ -44,8 +45,7 @@ def main(config):
         else:
             model = model.to(device)
 
-        if config.model_name == 'ViTbCLIP_SpatialTemporal_dropout':
-            model = model.float()
+        # model = model.float()
 
         if config.trained_model != 'none':
             # load the trained model
@@ -70,7 +70,7 @@ def main(config):
         elif config.loss_type == 'Huberloss':
             criterion = nn.HuberLoss().to(device)
 
-        model.clip.logit_scale.requires_grad = False
+        # model.clip.logit_scale.requires_grad = False
 
         param_num = 0
         for param in model.parameters():
@@ -104,11 +104,10 @@ def main(config):
             imgs_dir = 'data/FETV_base_all_frames'
             mosfile = config.mosfile
             print('using the mos file: ', mosfile)
-            trainset = VideoDataset_train(imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
+            trainset = viCLIP_trainDT(imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
                                           transformations_train, config.crop_size,
                                           prompt_num=config.prompt_num, seed=seed)
-            valset = VideoDataset_val_test(imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-                                           transformations_vandt, 'val', config.crop_size,
+            valset = viCLIP_vandtDT(imgs_dir, mosfile,'val', config.crop_size,
                                            prompt_num=config.prompt_num, seed=seed)
 
         # dataloader
@@ -129,28 +128,17 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk, tem_feat, spa_feat, prmt, mos) in enumerate(train_loader):
+            for i, (v_l, prmt, mos) in enumerate(train_loader):
 
                 optimizer.zero_grad()
                 label=[]
                 for l in range(len(mos)):
                     label.append(mos[l].to(device).float())
-                    
-                # label = mos.to(device).float()
-                # labelt = mos[1].to(device).float()
-                
-                vid_chunk = vid_chunk.to(device)
-                tem_feat = tem_feat.to(device)
-                spa_feat = spa_feat.to(device)
-                
+                v_l=v_l.to(device)                
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
-                    t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt)
-
-                    loss = criterion(label[0],t[3]) \
-                        +criterion(label[1],s[3]) \
-                        +criterion(label[2],a[3])
-                    loss /= len(mos)
-
+                    score = model(image=v_l,raw_text=prmt,idx=0,return_sims=True)
+                    # print(score.shape)
+                    loss = criterion(label[2],score) 
                 batch_losses.append(loss.item())
                 batch_losses_each_disp.append(loss.item())
                 scaler.scale(loss).backward()
@@ -183,183 +171,53 @@ def main(config):
             with torch.no_grad():
                 model.eval()
                 label = np.zeros([len(valset),3])
-                Tem_y = np.zeros([len(valset),4])
-                Spa_y = np.zeros([len(valset),4])
-                Ali_y = np.zeros([len(valset),4])
+                Ali_y = np.zeros(len(valset))
                 
-                for i, (vid_chunk, vid_chunk_l, tem_feat, tem_feat_l,\
-                    spa_feat, spa_feat_l, mos,count, prmt) in enumerate(val_loader):
-
+                for i, (v_l, v_g, prmt, mos, count) in enumerate(val_loader):
                     for j in range(len(mos)):
                         label[i][j] = mos[j].item()
-                    
-                    # mid_t stores xt,qt-t,qs-t,qst-t
-                    mid_t=torch.zeros(4).to(device)
-                    mid_s=torch.zeros(4).to(device)
-                    mid_a=torch.zeros(4).to(device)
-                    
+                    score=0
+
                     for j in range(count):
-                        vid_chunk[j] = vid_chunk[j].to(device)
-                        tem_feat[j] = tem_feat[j].to(device)
-                        spa_feat[j] = spa_feat[j].to(device)
-                        t, s, a = model(vid_chunk[j], tem_feat[j], spa_feat[j], prmt)
-
-                        mid_t+=t.squeeze(1)
-                        mid_s+=s.squeeze(1)
-                        mid_a+=a.squeeze(1)
-                        
+                        v_l[j] = v_l[j].to(device)
+                        score += model(image=v_l[j],raw_text=prmt,idx=0,return_sims=True)
                     count=count.to(device)
-                    mid_t/=count
-                    mid_s/=count
-                    mid_a/=count
+                    score/=count
 
-                    vid_chunk_l = vid_chunk_l.to(device)
-                    tem_feat_l = tem_feat_l.to(device)
-                    spa_feat_l = spa_feat_l.to(device)
-                    t, s, a = model(vid_chunk_l, tem_feat_l, spa_feat_l, prmt)
+                    v_g = v_g.to(device)
+                    score += model(image=v_g,raw_text=prmt,idx=0,return_sims=True)
+                    score/=2
+                    score=score.to('cpu')
+                    Ali_y[i]=score
 
-                    mid_t = (mid_t + t.squeeze(1))/2
-                    mid_s = (mid_s + s.squeeze(1))/2
-                    mid_a = (mid_a + a.squeeze(1))/2
-                    
-                    Tem_y[i] = mid_t.to('cpu')
-                    Spa_y[i] = mid_s.to('cpu')
-                    Ali_y[i] = mid_a.to('cpu')
-
-                tPLCC_b, tSRCC_b, tKRCC_b, tRMSE_b = performance_fit(
-                    label[:,0], Tem_y[:,0])
-                tPLCC_t, tSRCC_t, tKRCC_t, tRMSE_t = performance_fit(
-                    label[:,0], Tem_y[:,1])
-                tPLCC_s, tSRCC_s, tKRCC_s, tRMSE_s = performance_fit(
-                    label[:,0], Tem_y[:,2])
-                tPLCC_st, tSRCC_st, tKRCC_st, tRMSE_st = performance_fit(
-                    label[:,0], Tem_y[:,3])
-                
-                sPLCC_b, sSRCC_b, sKRCC_b, sRMSE_b = performance_fit(
-                    label[:,1], Spa_y[:,0])
-                sPLCC_t, sSRCC_t, sKRCC_t, sRMSE_t = performance_fit(
-                    label[:,1], Spa_y[:,1])
-                sPLCC_s, sSRCC_s, sKRCC_s, sRMSE_s = performance_fit(
-                    label[:,1], Spa_y[:,2])
-                sPLCC_st, sSRCC_st, sKRCC_st, sRMSE_st = performance_fit(
-                    label[:,1], Spa_y[:,3])
                 
                 aPLCC_b, aSRCC_b, aKRCC_b, aRMSE_b = performance_fit(
-                    label[:,2], Ali_y[:,0])
-                aPLCC_t, aSRCC_t, aKRCC_t, aRMSE_t = performance_fit(
-                    label[:,2], Ali_y[:,1])
-                aPLCC_s, aSRCC_s, aKRCC_s, aRMSE_s = performance_fit(
-                    label[:,2], Ali_y[:,2])
-                aPLCC_st, aSRCC_st, aKRCC_st, aRMSE_st = performance_fit(
-                    label[:,2], Ali_y[:,3])
+                    label[:,2], Ali_y)
                 
-                new_row=[tSRCC_b,tSRCC_t,tSRCC_s,tSRCC_st,
-                         sSRCC_b,sSRCC_t,sSRCC_s,sSRCC_st,
-                         aSRCC_b,aSRCC_t,aSRCC_s,aSRCC_st]
+                new_row=[aSRCC_b, aKRCC_b, aPLCC_b, aRMSE_b]
                 static.loc[len(static)]=new_row
                          
 
-                print('===============Tem==============')
-                    
-                print(
-                    'Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_b))
-                print(
-                    'Epoch {} completed. S val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_s))
-                print(
-                    'Epoch {} completed. T val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_t))
-                print(
-                    'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_st))
-                print('===============Spa==============')
-                print(
-                    'Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_b))
-                print(
-                    'Epoch {} completed. S val: SRCC: {:.4f}'.format( epoch + 1,sSRCC_s))
-                print(
-                    'Epoch {} completed. T val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_t))
-                print(
-                    'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_st))
-
-                print('===============Ali==============')
-                print(
-                    'Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_b))
-                print(
-                    'Epoch {} completed. S val: SRCC: {:.4f}'.format( epoch + 1,aSRCC_s))
-                print(
-                    'Epoch {} completed. T val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_t))
-                print(
-                    'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_st))
+                print('Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_b))
                     
                 
                 
         # ===================
         # save model
-                if (tSRCC_st+sSRCC_st+ aSRCC_st)/3 > best_val_criterion:
+                if aSRCC_b > best_val_criterion:
                     print(
                         "Update best model using best_val_criterion in epoch {}".format(epoch + 1))
-                    best_val_criterion = (tSRCC_st+sSRCC_st + aSRCC_st)/3
-                    # best_val_b = [tSRCC_b, tKRCC_b,
-                    #               tPLCC_b, tRMSE_b,
-                    #               sSRCC_b,sKRCC_b,
-                    #               sPLCC_b,sRMSE_b]
-                    # best_val_s = [tSRCC_s, tKRCC_s,
-                    #               tPLCC_s, tRMSE_s,
-                    #               sSRCC_s,sKRCC_s,
-                    #               sPLCC_s,sRMSE_s]
-                    # best_val_t = [tSRCC_t, tKRCC_t,
-                    #               tPLCC_t, tRMSE_t,
-                    #               sSRCC_t,sKRCC_t,
-                    #               sPLCC_t,sRMSE_t]
-                    best_val_st = [tSRCC_st, tKRCC_st,
-                                   tPLCC_st, tRMSE_st,
-                                   sSRCC_st,sKRCC_st,
-                                    sPLCC_st,sRMSE_st,
-                                    aSRCC_st,aKRCC_st,
-                                    aPLCC_st,aRMSE_st]
-
+                    best_val_criterion = aSRCC_b
+                    best_val_b = [aSRCC_b, aKRCC_b,
+                                  aPLCC_b, aRMSE_b]
 
                     print('Saving model...')
                     torch.save(model.state_dict(), f'ckpts_modular/{loop}_{epoch}.pth')
 
         print('Training completed.')    
-        print('===============BSET tem==============')
-
-        # print(
-        #     'The best training result on the base validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_val_b[0], best_val_b[1], best_val_b[2], best_val_b[3]))
-
-        # print(
-        #     'The best training result on the S validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_val_s[0], best_val_s[1], best_val_s[2], best_val_s[3]))
-
-        # print(
-        #     'The best training result on the T validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_val_t[0], best_val_t[1], best_val_t[2], best_val_t[3]))
-
         print(
             'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                best_val_st[0], best_val_st[1], best_val_st[2], best_val_st[3]))
-
-        print('===============BSET spa==============')
-        # print(
-        #     'The best training result on the base validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_val_b[4], best_val_b[5], best_val_b[6], best_val_b[7]))
-
-        # print(
-        #     'The best training result on the S validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_val_s[4], best_val_s[5], best_val_s[6], best_val_s[7]))
-
-        # print(
-        #     'The best training result on the T validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-        #         best_val_t[4], best_val_t[5], best_val_t[6], best_val_t[7]))
-
-        print(
-            'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                best_val_st[4], best_val_st[5], best_val_st[6], best_val_st[7]))
-
-        print('===============BSET ali==============')
-        print(
-            'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                best_val_st[8], best_val_st[9], best_val_st[10], best_val_st[11]))
+                best_val_b[0], best_val_b[1], best_val_b[2], best_val_b[3 ]))
         static.to_csv('logs/static.csv',index=False)
 
         # data = {"b":best_val_b,
@@ -377,7 +235,7 @@ if __name__ == '__main__':
     # input parameters
     parser.add_argument('--database', type=str, default='FETV')
     parser.add_argument('--model_name', type=str,
-                        default='ViTbCLIP_SpatialTemporal_dropout')
+                        default='viCLIP')
     parser.add_argument('--feat_len', type=int, default=8)
     parser.add_argument('--total_loop', type=int, default=5)
     parser.add_argument('--prompt_num', type=int, default=619)

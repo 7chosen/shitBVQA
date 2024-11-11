@@ -7,6 +7,7 @@ qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
 
 
 class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
+
     def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
         super(ViTbCLIP_SpatialTemporal_dropout, self).__init__()
         ViT_B_16, _ = clip.load("ViT-B/16")
@@ -61,26 +62,18 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         # x: batch * frames x 3-channel x height x width
         # eg. 16*8*3*224*224
         
-        # b_s * 512
-        image_features=torch.zeros([x_size[0],512])
-        for i in range(x_size[0]):
-            
-            mid=self.clip.encode_image(x[i])
-            # frames*512
-            mid=mid/mid.norm(dim=1,keepdim=True)
-            image_features[i]=torch.mean(mid,dim=0)
-        image_features=image_features.to(x.device)
-            
-        # x = x.view(-1, x_size[2], x_size[3], x_size[4])
+        x = x.view(-1, x_size[2], x_size[3], x_size[4])
 
         # Using clip.text
         # input shape (batch_size*frame_num)*c*h*w, which h and w must be 224
-        # image_features = self.clip.encode_image(x)
+        image_features = self.clip.encode_image(x)
         # (batch_size*frame_num) * 512
 
         # Normalize image features
-        # image_features = image_features / image_features.norm(dim=1, keepdim=True)
-        # image_features=torch.mean(image_features,dim=0,keepdim=True)
+        image_features = image_features / image_features.norm(dim=1, keepdim=True)
+        image_features=image_features.view(x_size[0],x_size[1],-1)
+        image_features=torch.mean(image_features,dim=1)
+        image_features=image_features.to(x.device)
 
         # Get logit scale
         logit_scale = self.clip.logit_scale.exp()
@@ -226,3 +219,50 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         
         # return x, qt, qs, qst
         return t, s, a
+
+
+
+class ViTbCLIP_only_clip(torch.nn.Module):
+
+    def __init__(self, feat_len=8):
+        super(ViTbCLIP_SpatialTemporal_dropout, self).__init__()
+        ViT_B_16, _ = clip.load("ViT-B/16")
+
+        # clip_vit_b_pretrained_features = ViT_B_16.visual
+        # self.feature_extraction = clip_vit_b_pretrained_features
+        
+        self.clip=ViT_B_16
+        self.feat_len = feat_len
+
+    def forward(self, x, prmt):
+        x_size = x.shape
+        # x: batch * frames x 3-channel x height x width
+        # eg. 16*8*3*224*224
+        
+        x = x.view(-1, x_size[2], x_size[3], x_size[4])
+
+        # Using clip.text
+        # input shape (batch_size*frame_num)*c*h*w, which h and w must be 224
+        image_features = self.clip.encode_image(x)
+        # (batch_size*frame_num) * 512
+
+        # Normalize image features
+        image_features = image_features / image_features.norm(dim=1, keepdim=True)
+        image_features=image_features.view(x_size[0],x_size[1],-1)
+        image_features=torch.mean(image_features,dim=1)
+        image_features=image_features.to(x.device)
+
+        # Get logit scale
+        logit_scale = self.clip.logit_scale.exp()
+
+        
+        alignment = clip.tokenize(prmt).to(x.device)
+        alignment = self.clip.encode_text(alignment)
+        ali_feat = alignment / alignment.norm(dim=1,keepdim=True)
+        ali_feat =logit_scale * image_features @ ali_feat.t()
+        # batch * 16
+        xa = torch.mean(ali_feat, dim=1,keepdim=True)
+        # batch*1
+
+        # return x, qt, qs, qst
+        return xa
