@@ -18,6 +18,7 @@ from modular_utils import plcc_loss, plcc_rank_loss
 from torchvision import transforms
 import time
 from modular_model import modular
+from modular_model import modular_v1
 from torch.amp import GradScaler
 # from config import T2V_model
 
@@ -34,7 +35,7 @@ def main(config):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if config.model_name == 'ViTbCLIP_SpatialTemporal_dropout':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=config.feat_len)
+            model = modular_v1.ViTbCLIP_SpatialTemporal_dropout_meanpool(feat_len=config.feat_len)
 
         print('The current model is ' + config.model_name)
 

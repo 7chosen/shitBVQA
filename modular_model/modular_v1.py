@@ -345,6 +345,7 @@ class ViTbCLIP_SpatialTemporal_dropout_meanpool(torch.nn.Module):
         text_features = text_features / text_features.norm(dim=1, keepdim=True)
 
         text_features = text_features.view(x_size[0], -1, text_features.size(1))
+        # print(text_features.shape)
 
         x = x.view(-1, x_size[2], x_size[3], x_size[4])
         image_features = self.clip.encode_image(x)
