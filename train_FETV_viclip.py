@@ -13,7 +13,7 @@ from modular_utils import performance_fit
 from modular_utils import plcc_loss, plcc_rank_loss
 from torchvision import transforms
 import time
-from model import modular
+from modular_model import modular
 from torch.amp import GradScaler
 # from config import T2V_model
 # from transformers import AutoModel
@@ -83,7 +83,6 @@ def main(config):
         #             f.write(f"Parameter Name: {name}\n")
         #             # f.write(f"Values: {param.data}\n")
         #             f.write("\n")
-        # json.dump(tem,f,indent=4)
 
         transformations_train = transforms.Compose(
             [transforms.Resize(config.resize, interpolation=transforms.InterpolationMode.BICUBIC),
@@ -138,7 +137,10 @@ def main(config):
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
                     score = model(image=v_l,raw_text=prmt,idx=0,return_sims=True)
                     # print(score.shape)
-                    loss = criterion(label[2],score) 
+                    loss = criterion(label[0],score[0]) \
+                        + criterion(label[1],score[1]) \
+                        + criterion(label[2],score[2]) 
+                    loss/=3
                 batch_losses.append(loss.item())
                 batch_losses_each_disp.append(loss.item())
                 scaler.scale(loss).backward()
@@ -171,53 +173,83 @@ def main(config):
             with torch.no_grad():
                 model.eval()
                 label = np.zeros([len(valset),3])
+                Tem_y = np.zeros(len(valset))
+                Spa_y = np.zeros(len(valset))
                 Ali_y = np.zeros(len(valset))
                 
                 for i, (v_l, v_g, prmt, mos, count) in enumerate(val_loader):
                     for j in range(len(mos)):
                         label[i][j] = mos[j].item()
                     score=0
+                    score_1=0
+                    score_2=0
 
                     for j in range(count):
                         v_l[j] = v_l[j].to(device)
-                        score += model(image=v_l[j],raw_text=prmt,idx=0,return_sims=True)
+                        tem = model(image=v_l[j],raw_text=prmt,idx=0,return_sims=True)
+                        score +=tem[0]
+                        score_1+= tem[1]
+                        score_2+= tem[2]
+                    
                     count=count.to(device)
                     score/=count
+                    score_1/=count
+                    score_2/=count
 
                     v_g = v_g.to(device)
-                    score += model(image=v_g,raw_text=prmt,idx=0,return_sims=True)
+                    tem= model(image=v_g,raw_text=prmt,idx=0,return_sims=True)
+                    
+                    score+=tem[0]
                     score/=2
                     score=score.to('cpu')
-                    Ali_y[i]=score
+                    Tem_y[i]=score
 
-                
+                    score_1+=tem[1]
+                    score_1/=2
+                    score_1=score_1.to('cpu')
+                    Spa_y[i]=score_1
+
+                    score_2+=tem[2]
+                    score_2/=2
+                    score_2=score_2.to('cpu')
+                    Ali_y[i]=score_2
+
+
+                tPLCC_b, tSRCC_b, tKRCC_b, tRMSE_b = performance_fit(
+                    label[:,0], Tem_y)
+                sPLCC_b, sSRCC_b, sKRCC_b, sRMSE_b = performance_fit(
+                    label[:,1], Spa_y)
                 aPLCC_b, aSRCC_b, aKRCC_b, aRMSE_b = performance_fit(
                     label[:,2], Ali_y)
                 
-                new_row=[aSRCC_b, aKRCC_b, aPLCC_b, aRMSE_b]
+                new_row=[tSRCC_b, sSRCC_b, aSRCC_b]
                 static.loc[len(static)]=new_row
-                         
 
-                print('Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_b))
+                print('Epoch {} completed.==TEM== base val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_b))
+                print('Epoch {} completed.==SPA== base val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_b))
+                print('Epoch {} completed.==ALI== base val: SRCC: {:.4f}'.format(epoch + 1,aSRCC_b))
                     
                 
                 
         # ===================
         # save model
-                if aSRCC_b > best_val_criterion:
+                if (aSRCC_b+tSRCC_b+sSRCC_b)/3 > best_val_criterion:
                     print(
                         "Update best model using best_val_criterion in epoch {}".format(epoch + 1))
-                    best_val_criterion = aSRCC_b
-                    best_val_b = [aSRCC_b, aKRCC_b,
-                                  aPLCC_b, aRMSE_b]
+                    best_val_criterion = (aSRCC_b+tSRCC_b+sSRCC_b)/3
+                    best_val_b = [tSRCC_b, sSRCC_b, aSRCC_b]
 
                     print('Saving model...')
                     torch.save(model.state_dict(), f'ckpts_modular/{loop}_{epoch}.pth')
 
         print('Training completed.')    
         print(
-            'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-                best_val_b[0], best_val_b[1], best_val_b[2], best_val_b[3 ]))
+            'The best training result tSRCC: {:.4f}, sSRCC: {:.4f}, aSRCC: {:.4f}'.format(
+                best_val_b[0], best_val_b[1], best_val_b[2]))
+
+        # make a flag in .csv
+        new_row=[0,0,0]
+        static.loc[len(static)]=new_row
         static.to_csv('logs/static.csv',index=False)
 
         # data = {"b":best_val_b,

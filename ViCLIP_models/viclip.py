@@ -1,6 +1,7 @@
 import logging
 import os
 
+import clip
 import torch
 from torch import nn
 
@@ -11,10 +12,11 @@ from .criterions import VTC_VTM_Loss
 logger = logging.getLogger(__name__)
 
 
+qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
 class ViCLIP(nn.Module):
     """docstring for ViCLIP"""
 
-    def __init__(self, tokenizer=None, is_pretrain=True,freeze_text=True):
+    def __init__(self, tokenizer=None, is_pretrain=True,freeze_text=False):
         super(ViCLIP, self).__init__()
 
         # self.config = config
@@ -56,6 +58,8 @@ class ViCLIP(nn.Module):
         if freeze_text:
             self.freeze_text()
 
+        self.tem_texts = [f'a photo with {q} temporal quality' for q in qualitys]
+        self.spa_texts = [f'a photo with {q} spatial quality' for q in qualitys]
         # if is_pretrain:
         #     pt='/home/user/Desktop/1/shitBVQA/ckpts_modular/ViCLIP-B_InternVid-FLT-10M.pth'
         #     state_dict = torch.load(pt, map_location='cpu')['model']
@@ -95,18 +99,30 @@ class ViCLIP(nn.Module):
 
         vision_embeds = self.encode_vision(image)
         # batch * 512
-        text_embeds = self.encode_text(raw_text)
+        text_embeds = self.encode_text(self.tem_texts)
+        text_embeds_1 = self.encode_text(self.spa_texts)
+        text_embeds_2 = self.encode_text(raw_text)
         # batch * 512
         if return_sims:
             vision_embeds=vision_embeds/vision_embeds.norm(dim=1,keepdim=True)
+
             text_embeds=text_embeds/text_embeds.norm(dim=1,keepdim=True)
+            text_embeds_1 =text_embeds_1/text_embeds_1.norm(dim=1,keepdim=True)
+            text_embeds_2=text_embeds_2/text_embeds_2.norm(dim=1,keepdim=True)
+
             sims= (1/self.temp)*vision_embeds@text_embeds.t()
-            sims=sims.diag()
-            # print(sims.shape)
+            sims=1*sims[:,0]+2*sims[:,1]+3*sims[:,2]+4*sims[:,3]+5*sims[:,4]
+
+            sims_1= (1/self.temp)*vision_embeds@text_embeds_1.t()
+            sims_1=1*sims_1[:,0]+2*sims_1[:,1]+3*sims_1[:,2]+4*sims_1[:,3]+5*sims_1[:,4]
+
+            sims_2= (1/self.temp)*vision_embeds@text_embeds_2.t()
+            sims_2=sims_2.diag()
+            # print(sims_2.shape)
 
             # sims = torch.nn.functional.normalize(vision_embeds, dim=-1) @ \
                 #   torch.nn.functional.normalize(text_embeds, dim=-1).transpose(0, 1)
-            return sims
+            return [sims,sims_1,sims_2]
 
         # calculate loss
 
