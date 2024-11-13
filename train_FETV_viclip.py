@@ -106,7 +106,7 @@ def main(config):
             trainset = viCLIP_trainDT(imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
                                           transformations_train, config.crop_size,
                                           prompt_num=config.prompt_num, seed=seed)
-            valset = viCLIP_vandtDT(imgs_dir, mosfile,'val', config.crop_size,
+            valset = viCLIP_vandtDT(imgs_dir, mosfile,transformations_vandt,'val', config.crop_size,
                                            prompt_num=config.prompt_num, seed=seed)
 
         # dataloader
@@ -136,7 +136,6 @@ def main(config):
                 v_l=v_l.to(device)                
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
                     score = model(image=v_l,raw_text=prmt,idx=0,return_sims=True)
-                    # print(score.shape)
                     loss = criterion(label[0],score[0]) \
                         + criterion(label[1],score[1]) \
                         + criterion(label[2],score[2]) 
@@ -298,7 +297,6 @@ if __name__ == '__main__':
                         default='data/FETV.csv')
 
     config = parser.parse_args()
-
     torch.manual_seed(0)  #
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False

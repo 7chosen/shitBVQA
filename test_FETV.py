@@ -6,6 +6,7 @@ import torch
 import torch.nn
 from torchvision import transforms
 from modular_model import modular
+from modular_model import modular_v1
 from modular_utils import performance_fit
 from train_dataloader import VideoDataset_val_test
 
@@ -17,7 +18,7 @@ def main(config):
     static = pd.read_csv('logs/static_ret.csv')
 
     if config.model_name == 'ViTbCLIP_SpatialTemporal_modular_dropout':
-        model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=8)
+        model = modular_v1.ViTbCLIP_SpatialTemporal_dropout(feat_len=8)
 
     if config.multi_gpu:
         model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
@@ -75,7 +76,6 @@ def main(config):
                 tem_feat_g[j] = tem_feat_g[j].to(device)
                 spa_feat_g[j] = spa_feat_g[j].to(device)
                 t,s,a = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j], prmt)
-
                 mid_t+=t.squeeze(1)
                 mid_s+=s.squeeze(1)
                 mid_a+=a.squeeze(1)
@@ -91,9 +91,13 @@ def main(config):
             t,s,a= model(
                 vid_chunk_l, tem_feat_l, spa_feat_l, prmt)
 
+            # mid_t = (mid_t + t)/2
+            # mid_s = (mid_s + s)/2
+            # mid_a = (mid_a + a)/2
             mid_t = (mid_t + t.squeeze(1))/2
             mid_s = (mid_s + s.squeeze(1))/2
             mid_a = (mid_a + a.squeeze(1))/2
+
             
             Tem_y[i] = mid_t.to('cpu')
             Spa_y[i] = mid_s.to('cpu')
@@ -128,50 +132,57 @@ def main(config):
 
 
         new_row=[
-                tSRCC_b,tKRCC_b, tPLCC_b, tRMSE_b,
-                tSRCC_t, tKRCC_t, tPLCC_t, tRMSE_t,
-                tSRCC_s, tKRCC_s, tPLCC_s, tRMSE_s,
-                tSRCC_st,tKRCC_st, tPLCC_st, tRMSE_st,
-                sSRCC_b,sKRCC_b, sPLCC_b, sRMSE_b,
-                sSRCC_t,sKRCC_t, sPLCC_t, sRMSE_t,
-                sSRCC_s,sKRCC_s, sPLCC_s, sRMSE_s,
-                sSRCC_st,sKRCC_st, sPLCC_st, sRMSE_st,
-                aSRCC_b, aSRCC_b, aKRCC_b, aRMSE_b,
-                aSRCC_t, aSRCC_t, aKRCC_t, aRMSE_t,
-                aSRCC_s,aSRCC_s, aKRCC_s, aRMSE_s,
-                aSRCC_st,aSRCC_st, aKRCC_st, aRMSE_st
-                ]
+                tSRCC_b,
+                tSRCC_t, 
+                tSRCC_s, 
+                tSRCC_st]
+        static.loc[len(static)]=new_row
+                # tSRCC_st,tKRCC_st, tPLCC_st, tRMSE_st,
+        new_row=[sSRCC_b,
+                sSRCC_t,
+                sSRCC_s,
+                sSRCC_st]
+        static.loc[len(static)]=new_row
+                # sSRCC_st,sKRCC_st, sPLCC_st, sRMSE_st,
+        new_row=[aSRCC_b, 
+                aSRCC_t, 
+                aSRCC_s,
+                aSRCC_st]
+                # aSRCC_st,aSRCC_st, aKRCC_st, aRMSE_st
         static.loc[len(static)]=new_row
 
         print('===============Tem==============')
         print(
-            'base val: SRCC: {:.4f}'.format(tSRCC_b))
+            'base test: SRCC: {:.4f}'.format(tSRCC_b))
         print(
-            'T val: SRCC: {:.4f}'.format(tSRCC_t))
+            'T test: SRCC: {:.4f}'.format(tSRCC_t))
         print(
-            'S val: SRCC: {:.4f}'.format(tSRCC_s))
+            'S test: SRCC: {:.4f}'.format(tSRCC_s))
         print(
-            'ST val: SRCC: {:.4f}'.format(tSRCC_st))
+            'ST test: SRCC: {:.4f}'.format(tSRCC_st))
         print('===============Spa==============')
         print(
-            'base val: SRCC: {:.4f}'.format(sSRCC_b))
+            'base test: SRCC: {:.4f}'.format(sSRCC_b))
         print(
-            'T val: SRCC: {:.4f}'.format(sSRCC_t))
+            'T test: SRCC: {:.4f}'.format(sSRCC_t))
         print(
-            'S val: SRCC: {:.4f}'.format(sSRCC_s))
+            'S test: SRCC: {:.4f}'.format(sSRCC_s))
 
         print(
-            'ST val: SRCC: {:.4f}'.format(sSRCC_st))
+            'ST test: SRCC: {:.4f}'.format(sSRCC_st))
 
         print('===============Ali==============')
         print(
-            'base val: SRCC: {:.4f}'.format(aSRCC_b))
+            'base test: SRCC: {:.4f}'.format(aSRCC_b))
         print(
-            'T val: SRCC: {:.4f}'.format(aSRCC_t))
+            'T test: SRCC: {:.4f}'.format(aSRCC_t))
         print(
-            'S val: SRCC: {:.4f}'.format(aSRCC_s))
+            'S test: SRCC: {:.4f}'.format(aSRCC_s))
         print(
-            'ST val: SRCC: {:.4f}'.format(aSRCC_st))
+            'ST test: SRCC: {:.4f}'.format(aSRCC_st))
+
+        new_row=[0,0,0,0] 
+        static.loc[len(static)]=new_row 
         static.to_csv('logs/static_ret.csv',index=False)        
     
 

@@ -50,7 +50,7 @@ def main(config):
          transforms.ToTensor(),
          transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
-    testset = viCLIP_vandtDT(imgs_dir,datainfo, 'test',
+    testset = viCLIP_vandtDT(imgs_dir,datainfo, transformations_vandt ,'test',
                                     config.crop_size, prompt_num=config.prompt_num, frame_num=config.frame_num, seed=config.seed)
 
     test_loader = torch.utils.data.DataLoader(testset, batch_size=1,
@@ -114,15 +114,15 @@ def main(config):
         static.loc[len(static)]=new_row
         print('===============Tem==============')
         print(
-            'base val: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'
+            'base test: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'
             .format(tSRCC_b,tKRCC_b,tPLCC_b,tRMSE_b))
         print('===============Spa==============')
         print(
-            'base val: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'
+            'base test: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'
             .format(sSRCC_b,sKRCC_b,sPLCC_b,sRMSE_b))
         print('===============Ali==============')
         print(
-            'base val: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'
+            'base test: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'
             .format(aSRCC_b,aKRCC_b,aPLCC_b,aRMSE_b))
         
         new_row=[0,0,0,0] 

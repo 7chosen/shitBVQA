@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy import interpolate
 
-from .prompts import VIDEO_PROMPTS, IMAGE_PROMPTS
+# from .prompts import VIDEO_PROMPTS, IMAGE_PROMPTS
 
 logger = logging.getLogger(__name__)
 
@@ -299,20 +299,20 @@ def disable_train(self, mode=True):
     does not change anymore."""
     return self
 
-def get_llama_prompt():
+# def get_llama_prompt():
 
 
-    video_formatted = []
+#     video_formatted = []
 
-    for prompt in VIDEO_PROMPTS:
-        if not any([x in prompt.lower() for x in ["follow", "subsequent", "below"]]):
-            video_formatted.append("USER: <Video><VisionHere></Video>" + prompt + "\n" + "ASSISTANT: ")
-        video_formatted.append("USER: " + prompt + "<Video><VisionHere></Video>\n" + "ASSISTANT: ")
+#     for prompt in VIDEO_PROMPTS:
+#         if not any([x in prompt.lower() for x in ["follow", "subsequent", "below"]]):
+#             video_formatted.append("USER: <Video><VisionHere></Video>" + prompt + "\n" + "ASSISTANT: ")
+#         video_formatted.append("USER: " + prompt + "<Video><VisionHere></Video>\n" + "ASSISTANT: ")
     
-    image_formatted = []
-    for prompt in IMAGE_PROMPTS:
-        if not any([x in prompt.lower() for x in ["follow", "subsequent", "below"]]):
-            image_formatted.append("USER: <Img><VisionHere></Img>" + prompt + "\n" + "ASSISTANT: ")
-        image_formatted.append("USER: " + prompt + "<Img><VisionHere></Img>\n" + "ASSISTANT: ")
+#     image_formatted = []
+#     for prompt in IMAGE_PROMPTS:
+#         if not any([x in prompt.lower() for x in ["follow", "subsequent", "below"]]):
+#             image_formatted.append("USER: <Img><VisionHere></Img>" + prompt + "\n" + "ASSISTANT: ")
+#         image_formatted.append("USER: " + prompt + "<Img><VisionHere></Img>\n" + "ASSISTANT: ")
 
-    return video_formatted, image_formatted
+#     return video_formatted, image_formatted

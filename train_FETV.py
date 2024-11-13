@@ -35,7 +35,7 @@ def main(config):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if config.model_name == 'ViTbCLIP_SpatialTemporal_dropout':
-            model = modular_v1.ViTbCLIP_SpatialTemporal_dropout_meanpool(feat_len=config.feat_len)
+            model = modular_v1.ViTbCLIP_SpatialTemporal_dropout(feat_len=config.feat_len)
 
         print('The current model is ' + config.model_name)
 
@@ -130,7 +130,7 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk, tem_feat, spa_feat, prmt, mos) in enumerate(train_loader):
+            for i, (v_l, t_l, s_l, prmt, mos) in enumerate(train_loader):
 
                 optimizer.zero_grad()
                 label=[]
@@ -140,12 +140,12 @@ def main(config):
                 # label = mos.to(device).float()
                 # labelt = mos[1].to(device).float()
                 
-                vid_chunk = vid_chunk.to(device)
-                tem_feat = tem_feat.to(device)
-                spa_feat = spa_feat.to(device)
+                v_l = v_l.to(device)
+                t_l = t_l.to(device)
+                s_l = s_l.to(device)
                 
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
-                    t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt)
+                    t, s, a = model(v_l, t_l, s_l, prmt)
 
                     loss = criterion(label[0],t[3]) \
                         +criterion(label[1],s[3]) \
@@ -188,8 +188,8 @@ def main(config):
                 Spa_y = np.zeros([len(valset),4])
                 Ali_y = np.zeros([len(valset),4])
                 
-                for i, (vid_chunk, vid_chunk_l, tem_feat, tem_feat_l,\
-                    spa_feat, spa_feat_l, mos,count, prmt) in enumerate(val_loader):
+                for i, (v_l, v_g, t_l, t_g,\
+                    s_l, s_g, mos, count, prmt) in enumerate(val_loader):
 
                     for j in range(len(mos)):
                         label[i][j] = mos[j].item()
@@ -200,10 +200,11 @@ def main(config):
                     mid_a=torch.zeros(4).to(device)
                     
                     for j in range(count):
-                        vid_chunk[j] = vid_chunk[j].to(device)
-                        tem_feat[j] = tem_feat[j].to(device)
-                        spa_feat[j] = spa_feat[j].to(device)
-                        t, s, a = model(vid_chunk[j], tem_feat[j], spa_feat[j], prmt)
+                        v_l[j] = v_l[j].to(device)
+                        t_l[j] = t_l[j].to(device)
+                        s_l[j] = s_l[j].to(device)
+                        t, s, a = model(v_l[j], t_l[j], s_l[j], prmt)
+
 
                         mid_t+=t.squeeze(1)
                         mid_s+=s.squeeze(1)
@@ -214,10 +215,10 @@ def main(config):
                     mid_s/=count
                     mid_a/=count
 
-                    vid_chunk_l = vid_chunk_l.to(device)
-                    tem_feat_l = tem_feat_l.to(device)
-                    spa_feat_l = spa_feat_l.to(device)
-                    t, s, a = model(vid_chunk_l, tem_feat_l, spa_feat_l, prmt)
+                    v_g = v_g.to(device)
+                    t_g = t_g.to(device)
+                    s_g = s_g.to(device)
+                    t, s, a = model(v_g, t_g, s_g, prmt)
 
                     mid_t = (mid_t + t.squeeze(1))/2
                     mid_s = (mid_s + s.squeeze(1))/2
@@ -294,10 +295,10 @@ def main(config):
                 
         # ===================
         # save model
-                if (tSRCC_st+sSRCC_st+ aSRCC_st)/3 > best_val_criterion:
+                if (tSRCC_st+sSRCC_st+ aSRCC_st) > best_val_criterion:
                     print(
                         "Update best model using best_val_criterion in epoch {}".format(epoch + 1))
-                    best_val_criterion = (tSRCC_st+sSRCC_st + aSRCC_st)/3
+                    best_val_criterion = (tSRCC_st+sSRCC_st + aSRCC_st)
                     # best_val_b = [tSRCC_b, tKRCC_b,
                     #               tPLCC_b, tRMSE_b,
                     #               sSRCC_b,sKRCC_b,

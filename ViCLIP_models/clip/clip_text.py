@@ -8,6 +8,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
+import torch.utils.checkpoint as checkpoint
+import functools
+
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +21,91 @@ _MODELS = {
     "CLIP-ViT-L/14": "https://huggingface.co/openai/clip-vit-large-patch14-336/vit_l14_text.pth",
     "CLIP-ViT-B/16": "https://huggingface.co/openai/clip-vit-base-patch16/vit_b16_text.pth",
 }
+
+
+# MODEL_PATH = 'https://huggingface.co/laion'
+# _MODELS = {
+#     "ViT-L/14": os.path.join(MODEL_PATH, "CLIP-ViT-L-14-DataComp.XL-s13B-b90K", "vit_l14_text.pth"),
+#     "ViT-B/16": os.path.join(MODEL_PATH, "CLIP-ViT-B-16-DataComp.XL-s13B-b90K", "vit_b16_text.pth"),
+# }
+
+
+from collections import OrderedDict
+from typing import Union, Dict
+
+def inspect_pth_file(pth_path: str, verbose: bool = True) -> Dict:
+    """
+    Inspect the shapes of all parameters in a .pth file
+    
+    Args:
+        pth_path: Path to the .pth file
+        verbose: If True, print shapes while analyzing
+        
+    Returns:
+        Dictionary containing parameter shapes
+    """
+    # Load the state dict
+    if not os.path.exists(pth_path):
+        raise FileNotFoundError(f"File not found: {pth_path}")
+    
+    try:
+        state_dict = torch.load(pth_path, map_location='cpu')
+    except Exception as e:
+        print(f"Error loading file: {e}")
+        return {}
+
+    # Handle different state dict formats
+    if isinstance(state_dict, OrderedDict):
+        params = state_dict
+    elif hasattr(state_dict, 'state_dict'):
+        params = state_dict.state_dict()
+    else:
+        try:
+            params = state_dict['state_dict']
+        except:
+            params = state_dict
+
+    # Store shapes in a dictionary
+    shapes = {}
+    total_params = 0
+    
+    # Get maximum key length for pretty printing
+    max_key_length = max(len(key) for key in params.keys())
+    
+    # Analyze each parameter
+    for key, tensor in params.items():
+        shape = tuple(tensor.shape)
+        shapes[key] = shape
+        num_params = torch.prod(torch.tensor(shape)).item()
+        total_params += num_params
+        
+        if verbose:
+            print(f"{key:<{max_key_length}} | Shape: {str(shape):<20} | Parameters: {num_params:,}")
+    
+    if verbose:
+        print("\nTotal Parameters:", f"{total_params:,}")
+        print("File size:", f"{os.path.getsize(pth_path)/1024/1024:.2f} MB")
+    
+    return shapes
+
+def inspect_nested_shapes(state_dict: Union[Dict, str], prefix: str = '') -> None:
+    """
+    Recursively inspect nested state dict shapes
+    
+    Args:
+        state_dict: Either a state dict or path to .pth file
+        prefix: Prefix for nested keys
+    """
+    if isinstance(state_dict, str):
+        state_dict = torch.load(state_dict, map_location='cpu')
+    
+    for key, value in state_dict.items():
+        current_prefix = f"{prefix}.{key}" if prefix else key
+        
+        if isinstance(value, dict):
+            inspect_nested_shapes(value, current_prefix)
+        elif isinstance(value, torch.Tensor):
+            print(f"{current_prefix}: {tuple(value.shape)}")
 
 
 class LayerNorm(nn.LayerNorm):
@@ -59,14 +147,21 @@ class ResidualAttentionBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None):
+    def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None,
+                 checkpoint_num: int = 0):
         super().__init__()
         self.width = width
         self.layers = layers
         self.resblocks = nn.Sequential(*[ResidualAttentionBlock(width, heads, attn_mask) for _ in range(layers)])
 
+        self.checkpoint_num = checkpoint_num
+
     def forward(self, x: torch.Tensor):
-        return self.resblocks(x)
+        if self.checkpoint_num > 0:
+            segments = min(self.checkpoint_num, len(self.resblocks))
+            return checkpoint.checkpoint_sequential(self.resblocks, segments, x,use_reentrant=False)
+        else:
+            return self.resblocks(x)
 
 
 class CLIP_TEXT(nn.Module):
@@ -77,7 +172,8 @@ class CLIP_TEXT(nn.Module):
             vocab_size: int,
             transformer_width: int,
             transformer_heads: int,
-            transformer_layers: int
+            transformer_layers: int,
+            checkpoint_num: int,
         ):
         super().__init__()
 
@@ -88,7 +184,8 @@ class CLIP_TEXT(nn.Module):
             width=transformer_width,
             layers=transformer_layers,
             heads=transformer_heads,
-            attn_mask=self.build_attention_mask()
+            attn_mask=self.build_attention_mask(),
+            checkpoint_num=checkpoint_num,
         )
 
         self.vocab_size = vocab_size
@@ -98,6 +195,10 @@ class CLIP_TEXT(nn.Module):
 
         self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
 
+    def no_weight_decay(self):
+        return {'token_embedding', 'positional_embedding'}
+
+    @functools.lru_cache(maxsize=None)
     def build_attention_mask(self):
         # lazily create causal attention mask, with full attention between the vision tokens
         # pytorch uses additive attention mask; fill with -inf
@@ -144,8 +245,7 @@ class CLIP_TEXT(nn.Module):
 
         return result
 
-    def forward(self, texts):
-        text = self.tokenize(texts).cuda()
+    def forward(self, text, return_embed=False):
         x = self.token_embedding(text)  # [batch_size, n_ctx, d_model]
 
         x = x + self.positional_embedding
@@ -156,10 +256,12 @@ class CLIP_TEXT(nn.Module):
 
         # x.shape = [batch_size, n_ctx, transformer.width]
         # take features from the eot embedding (eot_token is the highest number in each sequence)
-        x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
+        if return_embed:
+            return x @ self.text_projection, x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
+        else:
+            x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
 
         return x
-
 
 def clip_text_b16(
     embed_dim=512,
@@ -168,19 +270,49 @@ def clip_text_b16(
     transformer_width=512,
     transformer_heads=8,
     transformer_layers=12,
+    checkpoint_num=0,
+    pretrained=True,
 ):
+
     model = CLIP_TEXT(
         embed_dim,
         context_length,
         vocab_size,
         transformer_width,
         transformer_heads,
-        transformer_layers
+        transformer_layers,
+        checkpoint_num
     )
-    pretrained = _MODELS["ViT-B/16"]
-    logger.info(f"Load pretrained weights from {pretrained}")
-    state_dict = torch.load(pretrained, map_location='cpu')
-    model.load_state_dict(state_dict, strict=False)
+    if pretrained:
+        if isinstance(pretrained, str) and pretrained != "bert-base-uncased":
+            pretrained = _MODELS[pretrained]
+        else:
+            # pretrained = _MODELS["ViT-B/16"]
+            pretrained = "./ckpts_modular/ViCLIP-B_InternVid-FLT-10M.pth"
+        logger.info(f"Load pretrained weights from {pretrained}")
+        state_dict = torch.load(pretrained, map_location='cpu',weights_only=False)
+        mid=state_dict['model']
+        prefix = 'text_encoder.'
+        mid2 = {k[len(prefix):]: v for k, v in mid.items() if k.startswith(prefix)}
+        state_dict=mid2        
+        # print(state_dict.keys())
+        # inspect_nested_shapes(model.state_dict())
+        # inspect_nested_shapes(state_dict)
+
+        if context_length != state_dict["positional_embedding"].size(0):
+            # assert context_length < state_dict["positional_embedding"].size(0), "Cannot increase context length."
+            print(f"Resize positional embedding from {state_dict['positional_embedding'].size(0)} to {context_length}")
+            if context_length < state_dict["positional_embedding"].size(0):
+                state_dict["positional_embedding"] = state_dict["positional_embedding"][:context_length]
+            else:
+                state_dict["positional_embedding"] = F.pad(
+                    state_dict["positional_embedding"],
+                    (0, 0, 0, context_length - state_dict["positional_embedding"].size(0)),
+                    value=0,
+                )
+
+        message = model.load_state_dict(state_dict, strict=False)
+        # print(f"Load pretrained weights from {pretrained}: {message}")
     return model.eval()
 
 
@@ -191,6 +323,8 @@ def clip_text_l14(
     transformer_width=768,
     transformer_heads=12,
     transformer_layers=12,
+    checkpoint_num=0,
+    pretrained=True,
 ):
     model = CLIP_TEXT(
         embed_dim,
@@ -198,12 +332,29 @@ def clip_text_l14(
         vocab_size,
         transformer_width,
         transformer_heads,
-        transformer_layers
+        transformer_layers,
+        checkpoint_num,
     )
-    pretrained = _MODELS["ViT-L/14"]
+    if isinstance(pretrained, str) and pretrained != "bert-base-uncased":
+        pretrained = _MODELS[pretrained]
+    else:
+        pretrained = _MODELS["CLIP-ViT-L/14"]
     logger.info(f"Load pretrained weights from {pretrained}")
     state_dict = torch.load(pretrained, map_location='cpu')
-    model.load_state_dict(state_dict, strict=False)
+    if context_length != state_dict["positional_embedding"].size(0):
+        # assert context_length < state_dict["positional_embedding"].size(0), "Cannot increase context length."
+        print(f"Resize positional embedding from {state_dict['positional_embedding'].size(0)} to {context_length}")
+        if context_length < state_dict["positional_embedding"].size(0):
+            state_dict["positional_embedding"] = state_dict["positional_embedding"][:context_length]
+        else:
+            state_dict["positional_embedding"] = F.pad(
+                state_dict["positional_embedding"],
+                (0, 0, 0, context_length - state_dict["positional_embedding"].size(0)),
+                value=0,
+            )
+
+    message = model.load_state_dict(state_dict, strict=False)
+    print(f"Load pretrained weights from {pretrained}: {message}")
     return model.eval()
 
 
@@ -215,6 +366,7 @@ def clip_text_l14_336(
     transformer_heads=12,
     transformer_layers=12,
 ):
+    raise NotImplementedError
     model = CLIP_TEXT(
         embed_dim,
         context_length,

@@ -12,9 +12,6 @@ import torch.utils.checkpoint as checkpoint
 from ViCLIP_models.utils import load_temp_embed_with_mismatch
 logger = logging.getLogger(__name__)
 
-# Load model directly
-from transformers import AutoProcessor, AutoModelForZeroShotImageClassification
-
 
 # On P1, model extracted from 
 MODEL_PATH = 'https://huggingface.co/laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K'
@@ -71,7 +68,7 @@ class Transformer(nn.Module):
     def forward(self, x):
         for idx, blk in enumerate(self.resblocks):
             if idx < self.checkpoint_num:
-                x = checkpoint.checkpoint(blk, x)
+                x = checkpoint.checkpoint(blk, x,use_reentrant=False)
             else:
                 x = blk(x)
         return x
@@ -91,6 +88,10 @@ class VisionTransformer(nn.Module):
             (kernel_size, patch_size, patch_size), 
             (0, 0, 0), bias=False
         )
+        # weights=self.conv1.weight
+        # bias=self.conv1.bias
+        # print(weights)
+        # print(bias)
 
         scale = width ** -0.5
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
@@ -135,9 +136,14 @@ class VisionTransformer(nn.Module):
         return inputs[~masked_indices].reshape(B, -1, inputs.shape[-1])
 
     def forward(self, x, masking_prob=0.0, return_embed=False):
+        
+        # print(x[0][0][0][0][0])
+
         x = self.conv1(x)  # shape = [*, width, grid, grid]
         B, C, T, H, W = x.shape
         x = x.permute(0, 2, 3, 4, 1).reshape(B * T, H * W, C)
+
+        # print(x[0][0][0])
 
         x = torch.cat([self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]
         x = x + self.positional_embedding.to(x.dtype)

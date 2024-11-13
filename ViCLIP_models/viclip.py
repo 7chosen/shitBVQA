@@ -5,9 +5,9 @@ import clip
 import torch
 from torch import nn
 
-from .backbones.clip.clip_vision import clip_joint_l14, clip_joint_b16
-from .backbones.clip.clip_text import clip_text_l14, clip_text_b16
-from .criterions import VTC_VTM_Loss
+from .clip.clip_vision import clip_joint_l14, clip_joint_b16
+from .clip.clip_text import clip_text_l14, clip_text_b16
+# from .criterions import VTC_VTM_Loss
 
 from itertools import product
 logger = logging.getLogger(__name__)
@@ -53,19 +53,12 @@ class ViCLIP(nn.Module):
         self.temp_min = 1/100.0
 
         # criterions
-        self.clip_loss = VTC_VTM_Loss(False)
+        # self.clip_loss = VTC_VTM_Loss(False)
 
         # Freeze weights
         if freeze_text:
             self.freeze_text()
 
-        self.tem_texts = [f'a photo with {q} temporal quality' for q in qualitys]
-        self.spa_texts = [f'a photo with {q} spatial quality' for q in qualitys]
-        
-        # if is_pretrain:
-        #     pt='/home/user/Desktop/1/shitBVQA/ckpts_modular/ViCLIP-B_InternVid-FLT-10M.pth'
-        #     state_dict = torch.load(pt, map_location='cpu')['model']
-        #     self.load_state_dict(state_dict)
 
     def freeze_text(self):
         """freeze text encoder"""
@@ -102,7 +95,7 @@ class ViCLIP(nn.Module):
         input_texts=[]
         for i in range(image.shape[0]):
             prompt=[raw_text[i]]
-            texts=[f"a photo with {s} spatial quality and {t} temporal quality, which match {p}"
+            texts=[f"a video with {s} spatial quality and {t} temporal quality, which match {p}"
                    for s,t,p in product(qualitys,qualitys,prompt)]
             texts=self.encode_text(texts)
             texts=texts/texts.norm(dim=1,keepdim=True)
@@ -110,6 +103,7 @@ class ViCLIP(nn.Module):
         
         # batch * 25 * 512
         text_embeds = torch.stack(input_texts)
+
         # batch * 512
         vision_embeds = self.encode_vision(image)
         
@@ -121,7 +115,8 @@ class ViCLIP(nn.Module):
             sim = (1/self.temp) * visual_feat @ text_feat.t()
             sim_pre=sim
             
-            sim=nn.functional.softmax(sim)
+            sim=nn.functional.softmax(sim,dim=0)
+
             
             x_all.append(sim.unsqueeze(0))
             x_all_presoftmax.append(sim_pre.unsqueeze(0))
@@ -132,10 +127,12 @@ class ViCLIP(nn.Module):
         x_all_presoftmax=torch.cat(x_all_presoftmax,0)
         
         logits_all=x_all.view(-1,len(qualitys),len(qualitys))
+
         xs = logits_all.sum(2)
         xt = logits_all.sum(1)
-        xa = x_all_presoftmax.mean(1)
 
+        xa = x_all_presoftmax.mean(1)
+        
         xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
         xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]        
         
@@ -148,13 +145,13 @@ class ViCLIP(nn.Module):
         # calculate loss
 
         ## VTC loss
-        loss_vtc = self.clip_loss.vtc_loss(
-            vision_embeds, text_embeds, idx, self.temp, all_gather=True
-        )
+        # loss_vtc = self.clip_loss.vtc_loss(
+        #     vision_embeds, text_embeds, idx, self.temp, all_gather=True
+        # )
 
-        return dict(
-            loss_vtc=loss_vtc,
-        )
+        # return dict(
+        #     loss_vtc=loss_vtc,
+        # )
 
     def encode_vision(self, image, test=False):
         """encode image / videos as features.

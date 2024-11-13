@@ -281,8 +281,8 @@ class ViTbCLIP_SpatialTemporal_dropout_meanpool(torch.nn.Module):
         super(ViTbCLIP_SpatialTemporal_dropout_meanpool, self).__init__()
         ViT_B_16, _ = clip.load("ViT-B/16")
 
-        ckpt = torch.load('pickscore_vitb16.pt')
-        ViT_B_16.load_state_dict(ckpt['model_state_dict'])
+        # ckpt = torch.load('pickscore_vitb16.pt')
+        # ViT_B_16.load_state_dict(ckpt['model_state_dict'])
 
         # clip_vit_b_pretrained_features = ViT_B_16.visual
         # self.feature_extraction = clip_vit_b_pretrained_features
@@ -363,7 +363,7 @@ class ViTbCLIP_SpatialTemporal_dropout_meanpool(torch.nn.Module):
             text_feat = text_features[i, ...]
             cos_sim = logit_scale * visual_feat @ text_feat.t()
             cos_sim_pre = cos_sim
-            cos_sim = torch.nn.functional.softmax(cos_sim)
+            cos_sim = torch.nn.functional.softmax(cos_sim,dim=0)
             x_all.append(cos_sim.unsqueeze(0))
             x_all_presoftmax.append(cos_sim_pre.unsqueeze(0))
 
@@ -378,21 +378,18 @@ class ViTbCLIP_SpatialTemporal_dropout_meanpool(torch.nn.Module):
 
         xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
         xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]
-
+        # batch*1
+        
+        # print(xa.shape)
+        
         xs = xs.unsqueeze(1)
         xt = xt.unsqueeze(1)
         xa = xa.unsqueeze(1)
 
-        # xs = xs.view(x_size[0],-1)
-        # xt = xt.view(x_size[0],-1)
-        # xa = xa.view(x_size[0], -1)
-        # # batch*frame_num
-        # xs = torch.mean(xs, dim=1).unsqueeze(1)
-        # xt = torch.mean(xt, dim=1).unsqueeze(1)
-        # xa = torch.mean(xa, dim=1).unsqueeze(1)
-
 
         assert xa.shape == xs.shape == xt.shape, "shape is not same"
+
+        
         ones = torch.ones_like(xa)
 
         # spatial rectifier

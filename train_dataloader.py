@@ -364,6 +364,7 @@ class viCLIP_trainDT(data.Dataset):
                 self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
                 idx_copy+=prompt_num
         
+        self.transform=transform
         self.crop_size = crop_size
         self.frame_num = frame_num
 
@@ -393,7 +394,9 @@ class viCLIP_trainDT(data.Dataset):
             frame_len = self.frame_num * count
             for idx,i in enumerate(range(0,frame_len,count)):
                 img_name = os.path.join(img_path_name, f'{i}.png')
-                read_frame = cv2.imread(img_name)
+                read_frame = Image.open(img_name)
+                read_frame = read_frame.convert('RGB')
+                read_frame = self.transform(read_frame)
                 final_trans_img.append(read_frame)
 
             
@@ -404,10 +407,12 @@ class viCLIP_trainDT(data.Dataset):
             start_index = random.randint(0, frame_len-self.frame_num)
             for idx,i in enumerate(range(start_index, start_index + self.frame_num)):
                 img_name = os.path.join(img_path_name, f'{i}.png')
-                read_frame = cv2.imread(img_name)
+                read_frame = Image.open(img_name)
+                read_frame = read_frame.convert('RGB')
+                read_frame = self.transform(read_frame)
                 final_trans_img.append(read_frame)
-
-        imgs=frames2tensor(final_trans_img) 
+        imgs=torch.stack(final_trans_img)
+        # print(imgs.shape)
         
         
         return imgs, prmt, score
@@ -417,7 +422,7 @@ class viCLIP_vandtDT(data.Dataset):
     """Read data from the original dataset for feature extraction
     """
 
-    def __init__(self, imgs_dir, mosfile_path,
+    def __init__(self, imgs_dir, mosfile_path, transfrom,
                  database_name,crop_size, prompt_num, frame_num=8, seed=0):
         super(viCLIP_vandtDT, self).__init__()
 
@@ -460,6 +465,7 @@ class viCLIP_vandtDT(data.Dataset):
                     idx_copy+=prompt_num
         self.crop_size = crop_size
         self.frame_num = frame_num
+        self.transform=transfrom
 
     def __len__(self):
         return len(self.score)
@@ -481,9 +487,11 @@ class viCLIP_vandtDT(data.Dataset):
             tem_img=[]
             for j in range(start_idx,start_idx+self.frame_num):
                 img_name=os.path.join(img_path_name,f'{i}.png')
-                mid_value1=cv2.imread(img_name)
-                tem_img.append(mid_value1)
-            ret=frames2tensor(tem_img)
+                read_frame = Image.open(img_name)
+                read_frame = read_frame.convert('RGB')
+                read_frame = self.transform(read_frame)
+                tem_img.append(read_frame)
+            ret=torch.stack(tem_img)
             img_l.append(ret)
             start_idx+=self.frame_num
         if 0< frame_len-start_idx < self.frame_num:
@@ -492,9 +500,11 @@ class viCLIP_vandtDT(data.Dataset):
             start_idx=frame_len-self.frame_num
             for j in range(start_idx,frame_len):
                 img_name=os.path.join(img_path_name,f'{i}.png')
-                mid_value1=cv2.imread(img_name)
-                tem_img.append(mid_value1)
-            ret=frames2tensor(tem_img)
+                read_frame = Image.open(img_name)
+                read_frame = read_frame.convert('RGB')
+                read_frame = self.transform(read_frame)
+                tem_img.append(read_frame)
+            ret=torch.stack(tem_img)
             img_l.append(ret)
 
 
@@ -504,9 +514,11 @@ class viCLIP_vandtDT(data.Dataset):
         frame_len=count2*self.frame_num
         for idx,i in enumerate(range(0,frame_len,count2)):
             img_name = os.path.join(img_path_name,f'{i}.png')
-            mid_value1=cv2.imread(img_name)
-            img_g.append(mid_value1)
-        img_g=frames2tensor(img_g) 
+            read_frame = Image.open(img_name)
+            read_frame = read_frame.convert('RGB')
+            read_frame = self.transform(read_frame)
+            img_g.append(read_frame)
+        img_g=torch.stack(img_g)
         
         
         return img_l,img_g,prmt,score,count
