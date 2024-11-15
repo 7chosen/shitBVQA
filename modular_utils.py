@@ -28,7 +28,7 @@ def performance_fit(y_label, y_output):
     PLCC = stats.pearsonr(y_output, y_label)[0]
     SRCC = stats.spearmanr(y_output, y_label)[0]
     KRCC = stats.kendalltau(y_output, y_label)[0]
-    RMSE = np.sqrt(((y_output-y_label) ** 2).mean())
+    # RMSE = np.sqrt(((y_output-y_label) ** 2).mean())
     RMSE = np.sqrt(((y_output_logistic-y_label) ** 2).mean())
 
     return PLCC, SRCC, KRCC, RMSE

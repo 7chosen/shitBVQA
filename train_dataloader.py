@@ -18,16 +18,23 @@ class VideoDataset_train(data.Dataset):
     """Read data from the original dataset for feature extraction
     """
 
-    def __init__(self, imgs_dir, temporalFeat, spatialFeat, mosfile_path, transform,
+    def __init__(self, database, imgs_dir, temporalFeat, spatialFeat, mosfile_path, transform,
                  crop_size, prompt_num, frame_num=8, seed=0):
         super(VideoDataset_train, self).__init__()
 
         data_file=pd.read_csv(mosfile_path)
-        model_name=data_file.iloc[:,1]
-        prompt_file=data_file.iloc[:,2]
-        spa_file=data_file.iloc[:,3]
-        tem_file=data_file.iloc[:,4]
-        ali_file=data_file.iloc[:,5]
+        if database == 'FETV':
+            model_name=data_file.iloc[:,1]
+            prompt_file=data_file.iloc[:,2]
+            spa_file=data_file.iloc[:,3]
+            tem_file=data_file.iloc[:,4]
+            ali_file=data_file.iloc[:,5]
+        elif database == 'LGVQ':
+            model_name=data_file.iloc[:,0]
+            prompt_file = data_file.iloc[:,1]
+            spa_file=data_file.iloc[:,2]
+            tem_file=data_file.iloc[:,3]
+            ali_file=data_file.iloc[:,4]     
 
         random.seed(seed)
         np.random.seed(seed)
@@ -41,17 +48,16 @@ class VideoDataset_train(data.Dataset):
         self.score=[]
         
         for idx in train_index:
-            str_idx=str(idx)
             idx_copy=idx
-            for j in range(4):
+            for j in range(len(os.listdir(imgs_dir))):
                 mdl=model_name[idx_copy]
-
+                
                 self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
                 self.prompt_name.append(prompt_file[idx_copy])
                 
-                self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
-                self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
-                self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
+                self.img_path_dir.append(os.path.join(imgs_dir,mdl,prompt_file[idx_copy]))
+                self.s_feat_name.append(os.path.join(spatialFeat,mdl,prompt_file[idx_copy]))
+                self.t_feat_name.append(os.path.join(temporalFeat,mdl,prompt_file[idx_copy]))
                 idx_copy+=prompt_num
         
         self.crop_size = crop_size
@@ -67,8 +73,6 @@ class VideoDataset_train(data.Dataset):
         for ele in score:
             ele=torch.FloatTensor(np.array(float(ele)))
         prmt=self.prompt_name[idx]
-        # video_t_score = torch.FloatTensor(np.array(float(self.t_score[idx])))
-        # video_s_score = torch.FloatTensor(np.array(float(self.s_score[idx])))
         img_path_name = self.img_path_dir[idx]
         spatial_feat_name = self.s_feat_name[idx]
         temporal_feat_name = self.t_feat_name[idx] 
@@ -105,8 +109,12 @@ class VideoDataset_train(data.Dataset):
         # flage = 1, use random {self.frame_num} consecutive imgs
         # local sparse
         else:
-            frame_len = frame_len - 1
-            start_index = random.randint(0, frame_len-self.frame_num)
+            if frame_len - self.frame_num == 0:
+                start_index=0
+            else:
+                frame_len = frame_len - 1
+                start_index = random.randint(0, frame_len-self.frame_num)
+                
             random_range = list(range(start_index, start_index+self.frame_num))
             for idx,i in enumerate(range(start_index, start_index + self.frame_num)):
                 img_name = os.path.join(img_path_name, f'{i}.png')
@@ -131,16 +139,23 @@ class VideoDataset_val_test(data.Dataset):
     """Read data from the original dataset for feature extraction
     """
 
-    def __init__(self, imgs_dir, temporalFeat, spatialFeat, mosfile_path, transform,
+    def __init__(self, database, imgs_dir, temporalFeat, spatialFeat, mosfile_path, transform,
                  database_name, crop_size, prompt_num, seed=0, frame_num=8):
         super(VideoDataset_val_test, self).__init__()
 
         data_file=pd.read_csv(mosfile_path)
-        model_name=data_file.iloc[:,1]
-        prompt_file=data_file.iloc[:,2]
-        spa_file=data_file.iloc[:,3]
-        tem_file=data_file.iloc[:,4]
-        ali_file=data_file.iloc[:,5]
+        if database == 'FETV':
+            model_name=data_file.iloc[:,1]
+            prompt_file=data_file.iloc[:,2]
+            spa_file=data_file.iloc[:,3]
+            tem_file=data_file.iloc[:,4]
+            ali_file=data_file.iloc[:,5]
+        elif database == 'LGVQ':
+            model_name=data_file.iloc[:,0]
+            prompt_file = data_file.iloc[:,1]
+            spa_file=data_file.iloc[:,2]
+            tem_file=data_file.iloc[:,3]
+            ali_file=data_file.iloc[:,4] 
         
         random.seed(seed)
         np.random.seed(seed)
@@ -156,31 +171,42 @@ class VideoDataset_val_test(data.Dataset):
         
         if database_name == 'val':
             for idx in val_index:
-                str_idx=str(idx)
+                # str_idx=str(idx)
+                # idx_copy=idx
+                # for j in range(4):
+                #     mdl=model_name[idx_copy]
+                #     self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
+                #     self.prompt_name.append(prompt_file[idx_copy])
+
+                #     self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
+                #     self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
+                #     self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
+                #     idx_copy+=prompt_num
                 idx_copy=idx
-                for j in range(4):
+                for j in range(len(os.listdir(imgs_dir))):
                     mdl=model_name[idx_copy]
+                    
                     self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
                     self.prompt_name.append(prompt_file[idx_copy])
-
-                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
-                    self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
-                    self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
+                    
+                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,prompt_file[idx_copy]))
+                    self.s_feat_name.append(os.path.join(spatialFeat,mdl,prompt_file[idx_copy]))
+                    self.t_feat_name.append(os.path.join(temporalFeat,mdl,prompt_file[idx_copy]))
                     idx_copy+=prompt_num
                     
         if database_name == 'test':
             for idx in test_index:
-                str_idx=str(idx)
                 idx_copy=idx
-                for j in range(4):
+                for j in range(len(os.listdir(imgs_dir))):
                     mdl=model_name[idx_copy]
+                    
                     self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
                     self.prompt_name.append(prompt_file[idx_copy])
-
-                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
-                    self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
-                    self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
-                    idx_copy+=prompt_num   
+                    
+                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,prompt_file[idx_copy]))
+                    self.s_feat_name.append(os.path.join(spatialFeat,mdl,prompt_file[idx_copy]))
+                    self.t_feat_name.append(os.path.join(temporalFeat,mdl,prompt_file[idx_copy]))
+                    idx_copy+=prompt_num 
 
                     
         self.crop_size = crop_size

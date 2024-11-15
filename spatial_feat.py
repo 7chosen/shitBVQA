@@ -6,8 +6,8 @@ import os
 import numpy as np
 import random
 from argparse import ArgumentParser
-from spatial_dataloader import VideoDataset
-from config import T2V_model
+from spatial_dataloader import VideoDataset,VideoDataset_LGVQ
+from config import LGVQ_T2V_model,FETV_T2V_model
 import scipy.io as scio
 
 
@@ -77,7 +77,7 @@ def get_features(video_data, layer=2, frame_batch_size=10, device='cuda'):
 if __name__ == "__main__":
     parser = ArgumentParser(description='"Extracting Laplacian Pyramids Features using Pre-Trained ResNet-18')
     parser.add_argument("--seed", type=int, default=20241017)
-    parser.add_argument('--database', default='FETV', type=str,
+    parser.add_argument('--database', default='LGVQ', type=str,
                         help='database name (default: KoNViD-1k)')
     parser.add_argument('--frame_batch_size', type=int, default=64,
                         help='frame batch size for feature extraction (default: 64)')
@@ -113,7 +113,7 @@ if __name__ == "__main__":
         # video_length_read = 8
 
     elif args.database == 'FETV':
-        for t2vmdl in T2V_model:
+        for t2vmdl in FETV_T2V_model:
             print('========================',t2vmdl)
             vids_dir = f'/home/user/Documents/vqadata/FETV/{t2vmdl}/videos'
             save_folder = f'data/FETV_spatial_all_frames/{t2vmdl}'
@@ -132,4 +132,23 @@ if __name__ == "__main__":
                 for j in range(video_length):
                     img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
                     np.save(os.path.join(save_folder, str(i), str(j)), img_features.to('cpu').numpy())
+    
+    elif args.database == 'LGVQ':
+        for t2vmdl in LGVQ_T2V_model:
+            print('======',t2vmdl,'======')
+            vids_dir = '/home/user/Documents/vqadata/LGVQ/videos/'+t2vmdl
+            save_folder=f'/home/user/Documents/vqadata/BVQAdata/LGVQ_spa/{t2vmdl}'
+            dataset=VideoDataset_LGVQ(args.database, vids_dir, args.num_levels)
+
+            for i in range(468):
+                print(f'process {i}th vid')
+                dt, f_len, nm = dataset[i]
+                features=get_features(dt,args.layer, args.frame_batch_size,device)
+                exit_folder(os.path.join(save_folder,nm))
+                for j in range(f_len):
+                    img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
+                    np.save(os.path.join(save_folder, nm, str(j)), img_features.to('cpu').numpy())
+            break
+            
+
                     

@@ -1,5 +1,5 @@
 data/
-ckpts_modular/
+ckpts/
 .vscode/
 *__pycache__
 logs/
