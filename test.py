@@ -5,9 +5,9 @@ import pandas as pd
 import torch
 import torch.nn
 from torchvision import transforms
+from tqdm import tqdm
 import yaml
 from modular_model import modular
-# from modular_model import modular_v1
 from modular_utils import performance_fit, performance_no_fit
 from train_dataloader import VideoDataset_val_test
 from ViCLIP_models.viclip import ViCLIP
@@ -31,18 +31,19 @@ def main(config):
             model = modular.ViTbCLIP_SpatialTemporal_dropout_old(feat_len=opt["feat_len"])
         elif opt["model"] == 'exp':
             model = modular.ViTbCLIP_exp(feat_len=opt["feat_len"])
-        print('The current model is ' + opt["model"])
+        else:
+            model = ViCLIP()
+        print('The current model is: ' + opt["model"])
         
         # if config.multi_gpu:
         #     model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
         #     model = model.to(device)
         # else:
         model = model.to(device).float()
-        # model = model.float()
 
         # load the trained model
         ckpt_path=f'ckpts/{loop}.pth'
-        print(f'loading the trained model {ckpt_path}')
+        print(f'Loading the trained model: {ckpt_path}')
         model.load_state_dict(torch.load(ckpt_path, weights_only=1))
 
         transformations_vandt = transforms.Compose(
@@ -53,35 +54,9 @@ def main(config):
 
 
         # training data
-        print('using the mos file: ', opt["mos_file"])
-        # if opt["database"] == 'FETV':
-        #     prompt_num=619
-        #     spa_feat_dir = 'data/FETV_spatial_all_frames'
-        #     tem_feat_dir = 'data/FETV_temporal_all_frames'
-        #     imgs_dir = 'data/FETV_base_all_frames'
-        #     mosfile = opt["mos_file"]
-        #     testset = VideoDataset_val_test(opt["database"],imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-        #                                    transformations_vandt, 'val', opt["crop_size"],
-        #                                    prompt_num=prompt_num, seed=loop)
-        
-        # if opt["database"] == 'LGVQ':
-        #     prompt_num=468
-        #     imgs_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_frames'
-        #     tem_feat_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_tem'
-        #     spa_feat_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_spa'
-        #     mosfile = opt["mos_file"]
-        #     testset = VideoDataset_val_test(opt["database"], imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-        #                                    transformations_vandt, 'val', opt["crop_size"],
-        #                                    prompt_num=prompt_num, seed=loop)
-            
-        # if opt["database"] == 'T2VQA':
-        #     prompt_num=10000
-        #     imgs_dir = '/home/user/Documents/vqadata/BVQAdata/T2VQA_frames'
-        #     tem_feat_dir = '/home/user/Documents/vqadata/BVQAdata/T2VQA_tem'
-        #     spa_feat_dir = '/home/user/Documents/vqadata/BVQAdata/T2VQA_spa'
-        #     mosfile = opt["mos_file"]
+        print('Using the mos file: ', opt["mos_file"])
         testset = VideoDataset_val_test(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
-                                            opt["mos_file"],transformations_vandt, 'val', opt["crop_size"],
+                                            opt["mos_file"],transformations_vandt, 'test', opt["crop_size"],
                                            prompt_num = opt["prompt_num"], seed=loop)
 
 
@@ -91,25 +66,18 @@ def main(config):
         with torch.no_grad():
             model.eval()
             label = np.zeros([len(testset),3])
-            Tem_y = np.zeros([len(testset),4])
-            Spa_y = np.zeros([len(testset),4])
-            Ali_y = np.zeros([len(testset),4])
+            Tem_y, Spa_y, Ali_y = [np.zeros([len(testset), 4]) for _ in range(3)]
         
             for i, (vid_chunk_g, vid_chunk_l, tem_feat_g, tem_feat_l,
-                    spa_feat_g, spa_feat_l, mos,count,prmt) in enumerate(test_loader):
-                # print(i)
+                    spa_feat_g, spa_feat_l, mos,count,prmt) in enumerate(tqdm(test_loader, leave=True)):
                 for j in range(len(mos)):
                     label[i][j] = mos[j].item()
-                mid_t=torch.zeros(4).to(device)
-                mid_s=torch.zeros(4).to(device)
-                mid_a=torch.zeros(4).to(device)
+                mid_t, mid_s, mid_a = [torch.zeros(4) for _ in range(3)]
                 
                 for j in range(count):
                     vid_chunk_g[j] = vid_chunk_g[j].to(device)
                     tem_feat_g[j] = tem_feat_g[j].to(device)
                     spa_feat_g[j] = spa_feat_g[j].to(device)
-                    #t,s,a = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j], prmt)
-
                     if opt["model"] == 'ViTbCLIP_SpatialTemporal_dropout_hybrid':
                         t, s, a, tm, sm, am = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j], prmt)
                         t = (t + tm) / 2
@@ -117,37 +85,19 @@ def main(config):
                         a = (a + am) / 2
                     else:
                         t, s, a = model(vid_chunk_g[j], tem_feat_g[j], spa_feat_g[j], prmt)
-
-                    mid_t+=t.squeeze(1)
-                    mid_s+=s.squeeze(1)
-                    mid_a+=a.squeeze(1)
-                            
-                count=count.to(device)
-                mid_t/=count
-                mid_s/=count
-                mid_a/=count
-                
+                    mid_t, mid_s, mid_a = mid_t+t, mid_s+s, mid_a+a
+                mid_t, mid_s, mid_a = mid_t/count, mid_s/count, mid_a/count
                 vid_chunk_l = vid_chunk_l.to(device)
                 tem_feat_l = tem_feat_l.to(device)
                 spa_feat_l = spa_feat_l.to(device)
-                # t,s,a= model(
-                #     vid_chunk_l, tem_feat_l, spa_feat_l, prmt)
-
                 if opt["model"] == 'ViTbCLIP_SpatialTemporal_dropout_hybrid':
                     t, s, a, tm, sm, am = model(vid_chunk_l, tem_feat_l, spa_feat_l, prmt)
                     t = (t + tm) / 2
                     s = (s + sm) / 2
                     a = (a + am) / 2
                 else:
-                    t, s, a = model(vid_chunk_l, tem_feat_l, spa_feat_l, prmt)
-
-                mid_t = (mid_t + t.squeeze(1))/2
-                mid_s = (mid_s + s.squeeze(1))/2
-                mid_a = (mid_a + a.squeeze(1))/2
-                
-                Tem_y[i] = mid_t.to('cpu')
-                Spa_y[i] = mid_s.to('cpu')
-                Ali_y[i] = mid_a.to('cpu')
+                    t, s, a = model(vid_chunk_l, tem_feat_l, spa_feat_l, prmt) 
+                Tem_y[i], Spa_y[i], Ali_y[i] = (mid_t + t)/2, (mid_s + s)/2, (mid_a + a)/2
 
             # tPLCC_b, tSRCC_b, tKRCC_b, tRMSE_b = performance_fit(
             #     label[:,0], Tem_y[:,0])
@@ -176,7 +126,7 @@ def main(config):
             # aPLCC_st, aSRCC_st, aKRCC_st, aRMSE_st = performance_no_fit(
             #     label[:,2], Ali_y[:,3])    
 
-            aPLCC_st, aSRCC_st, aKRCC_st, aRMSE_st = performance_fit(
+            PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
                 label[:,0], (Tem_y[:,3]+Spa_y[:,3])/2) 
 
             # new_row=[
@@ -218,7 +168,7 @@ def main(config):
             #     .format(aSRCC_st,aKRCC_st,aPLCC_st,aRMSE_st))
             
             print('ST test: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, RMSE: {:.4f}'
-                .format(aSRCC_st,aKRCC_st,aPLCC_st,aRMSE_st))
+                .format(SRCC_st,KRCC_st,PLCC_st,RMSE_st))
 
         # new_row=[0,0,0,0,
         #             0,0,0,0,
@@ -230,30 +180,6 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
-    # input parameters
-    # parser.add_argument('--database', type=str, default='LGVQ')
-    # parser.add_argument('--model_name', type=str,
-    #                     default='aveScore')
-    # parser.add_argument('--num_workers', type=int, default=6)
-    # parser.add_argument('--frame_num', type=int, default=8)
-    # parser.add_argument('--feat_len', type=int, default=8)
-
-    # # misc
-    # # parser.add_argument('--trained_model', type=str,
-    # #                     default='ckpts/0_16.pth')
-    # parser.add_argument('--multi_gpu', action='store_true')
-    # parser.add_argument('--gpu_ids', type=list, default=None)
-    # parser.add_argument('--resize', type=int, default=256)
-    # parser.add_argument('--crop_size', type=int, default=224)
-    # parser.add_argument('--mosfile', type=str,
-    #                     default='/home/user/Documents/vqadata/BVQAdata/T2VQA_sorted.csv')
-    # parser.add_argument('--seed', type=int,default=0)
-    # parser.add_argument('--loop', type=int,default=1)
-    
-    parser.add_argument(
-        "-o", "--opt", type=str, default="./cfg.yml", help="the option file"
-    )
+    parser.add_argument("-o", "--opt", type=str, default="./cfg.yml", help="the option file")
     config = parser.parse_args()
-
     main(config)

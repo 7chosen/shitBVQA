@@ -1,13 +1,13 @@
 database: T2VQA
 model: aveScore
 feat_len: 8
-split: 1
+split: 10
 epochs: 30
 save_model: True
 
 # data config
 mos_file: /home/user/Documents/vqadata/BVQAdata/T2VQA.csv
-prompt_num: 468
+prompt_num: 10000
 imgs_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_frames
 tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_tem
 spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_spa

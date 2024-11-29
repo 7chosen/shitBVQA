@@ -8,7 +8,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import random
-
+from tqdm import tqdm
 import yaml
 from train_dataloader import VideoDataset_train, VideoDataset_val_test
 from modular_utils import performance_fit, performance_no_fit
@@ -27,8 +27,10 @@ def main(config):
 
     stats = pd.read_csv('logs/ViTval.csv')
 
-    for loop in range(opt["split"]):
-
+    for loop in range(opt["split"]):        
+        if loop == 0 :
+            continue
+        
         print('the %dth round training starts here' % (loop) )
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -56,8 +58,7 @@ def main(config):
             model.load_state_dict(torch.load(opt["pretrained_weights"], weights_only=1))
 
         # optimizer
-        optimizer = optim.Adam(
-            model.parameters(), lr=opt["lr"], weight_decay=0.0000001)
+        optimizer = optim.Adam(model.parameters(), lr=opt["lr"], weight_decay=0.0000001)
 
         scheduler = optim.lr_scheduler.StepLR(
             optimizer, step_size=opt["decay_interval"], gamma=opt["decay_ratio"])
@@ -97,51 +98,15 @@ def main(config):
              transforms.ToTensor(),
              transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
-        # training data
-        if opt["database"] == 'FETV':
-
-            prompt_num=619
-            spa_feat_dir = 'data/FETV_spatial_all_frames'
-            tem_feat_dir = 'data/FETV_temporal_all_frames'
-            imgs_dir = 'data/FETV_base_all_frames'
-            mosfile = opt["mos_file"]
-            print('using the mos file: ', mosfile)
-            trainset = VideoDataset_train(opt["database"] ,imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-                                          transformations_train, opt["crop_size"],
-                                          prompt_num=prompt_num, seed=loop)
-            valset = VideoDataset_val_test(opt["database"],imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-                                           transformations_vandt, 'val', opt["crop_size"],
-                                           prompt_num=prompt_num, seed=loop)
-        
-        if opt["database"] == 'LGVQ':
-            prompt_num=468
-            imgs_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_frames'
-            tem_feat_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_tem'
-            spa_feat_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_spa'
-            mosfile = opt["mos_file"]
-            print('using the mos file: ', mosfile)
-            trainset = VideoDataset_train(opt["database"], imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-                                          transformations_train, opt["crop_size"],
-                                          prompt_num=prompt_num, seed=loop)
-            valset = VideoDataset_val_test(opt["database"], imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-                                           transformations_vandt, 'val', opt["crop_size"],
-                                           prompt_num=prompt_num, seed=loop)
-            
-        if opt["database"] == 'T2VQA':
-            prompt_num=10000
-            imgs_dir = '/home/user/Documents/vqadata/BVQAdata/T2VQA_frames'
-            tem_feat_dir = '/home/user/Documents/vqadata/BVQAdata/T2VQA_tem'
-            spa_feat_dir = '/home/user/Documents/vqadata/BVQAdata/T2VQA_spa'
-            mosfile = opt["mos_file"]
-            print('using the mos file: ', mosfile)
-            trainset = VideoDataset_train(opt["database"], imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-                                          transformations_train, opt["crop_size"],
-                                          prompt_num=prompt_num, seed=loop)
-            valset = VideoDataset_val_test(opt["database"], imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
-                                           transformations_vandt, 'val', opt["crop_size"],
-                                           prompt_num=prompt_num, seed=loop)
 
         # dataloader
+        print('using the mos file: ', opt["mos_file"])        
+        trainset = VideoDataset_train(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
+                                            opt["mos_file"], transformations_train, opt["crop_size"],
+                                           prompt_num = opt["prompt_num"], seed=loop)
+        valset = VideoDataset_val_test(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
+                                            opt["mos_file"],transformations_vandt, 'val', opt["crop_size"],
+                                           prompt_num = opt["prompt_num"], seed=loop)
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=opt["train_batch_size"],
                                                    shuffle=True, num_workers=opt["num_workers"], drop_last=True)
         val_loader = torch.utils.data.DataLoader(valset, batch_size=1,
@@ -154,15 +119,15 @@ def main(config):
 
         scaler = GradScaler()
         for epoch in range(opt["epochs"]):
+            print(f'=== Current epoch: {epoch} ===')
             model.train()
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk, tem_feat, spa_feat, prmt, mos) in enumerate(train_loader):
+            for i, (vid_chunk, tem_feat, spa_feat, prmt, mos) in enumerate(tqdm(train_loader,desc='Training...')):
 
                 optimizer.zero_grad()
                 label=[]
-                # print(len(mos))
                 for _ in range(len(mos)):
                     label.append(mos[_].to(device).float())
                 vid_chunk = vid_chunk.to(device)
@@ -190,53 +155,41 @@ def main(config):
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
-
-                if (i + 1) % (opt["print_samples"] // opt["train_batch_size"]) == 0:
-                    session_end_time = time.time()
-                    avg_loss_epoch = sum(batch_losses_each_disp) / (opt["print_samples"]  // opt["train_batch_size"])
-                    print('Epoch: %d/%d | Step: %d/%d | Training loss: %.4f' %
-                          (epoch + 1, opt["epochs"], i + 1, len(trainset)// opt["train_batch_size"],
-                           avg_loss_epoch))
-                    batch_losses_each_disp = []
-                    print('CostTime: {:.4f}'.format(session_end_time - session_start_time))
-                    session_start_time = time.time()
-
-            avg_loss = sum(batch_losses) / \
-                (len(trainset) // opt["train_batch_size"])
-            print('Epoch %d averaged training loss: %.4f' %
-                  (epoch + 1, avg_loss))
-
+            avg_loss = sum(batch_losses) / (len(trainset) // opt["train_batch_size"])
+            print('Epoch %d averaged training loss: %.4f' %(epoch + 1, avg_loss))
             scheduler.step()
             lr = scheduler.get_last_lr()
             print('The current learning rate is {:.06f}'.format(lr[0]))
-
+                # if (i + 1) % (opt["print_samples"] // opt["train_batch_size"]) == 0:
+                #     session_end_time = time.time()
+                #     avg_loss_epoch = sum(batch_losses_each_disp) / (opt["print_samples"]  // opt["train_batch_size"])
+                #     print('Epoch: %d/%d | Step: %d/%d | Training loss: %.4f' %
+                #           (epoch + 1, opt["epochs"], i + 1, len(trainset)// opt["train_batch_size"],
+                #            avg_loss_epoch))
+                #     batch_losses_each_disp = []
+                #     print('CostTime: {:.4f}'.format(session_end_time - session_start_time))
+                #     session_start_time = time.time()
+                
         # ======================================
         # do validation after each epoch
-            #print(weighting_method.method.lambda_weight[:, epoch])
             with torch.no_grad():
                 model.eval()
                 label = np.zeros([len(valset),3])
-                Tem_y = np.zeros([len(valset),4])
-                Spa_y = np.zeros([len(valset),4])
-                Ali_y = np.zeros([len(valset),4])
+                Tem_y, Spa_y, Ali_y = [np.zeros([len(valset), 4]) for _ in range(3)]
                 
                 for i, (vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
-                    spa_feat, spa_feat_g, mos,count, prmt) in enumerate(val_loader):
+                    spa_feat, spa_feat_g, mos,count, prmt) in enumerate(tqdm(val_loader, desc='Validating...')):
 
                     for j in range(len(mos)):
                         label[i][j] = mos[j].item()
                     
                     # mid_t stores xt,qt-t,qs-t,qst-t
-                    mid_t=torch.zeros(4).to(device)
-                    mid_s=torch.zeros(4).to(device)
-                    mid_a=torch.zeros(4).to(device)
+                    mid_t, mid_s, mid_a = [torch.zeros(4) for _ in range(3)]
                     
                     for j in range(count):
                         vid_chunk[j] = vid_chunk[j].to(device)
                         tem_feat[j] = tem_feat[j].to(device)
                         spa_feat[j] = spa_feat[j].to(device)
-                        #t, s, a = model(vid_chunk[j], tem_feat[j], spa_feat[j], prmt)
-
                         if opt["model"] == 'ViTbCLIP_SpatialTemporal_dropout_hybrid':
                             t, s, a, tm, sm, am = model(vid_chunk[j], tem_feat[j], spa_feat[j], prmt)
                             t = (t + tm) / 2
@@ -244,16 +197,8 @@ def main(config):
                             a = (a + am) / 2
                         else:
                             t, s, a = model(vid_chunk[j], tem_feat[j], spa_feat[j], prmt)
-
-
-                        mid_t+=t.squeeze(1)
-                        mid_s+=s.squeeze(1)
-                        mid_a+=a.squeeze(1)
-                        
-                    count=count.to(device)
-                    mid_t/=count
-                    mid_s/=count
-                    mid_a/=count
+                        mid_t, mid_s, mid_a = mid_t+t, mid_s+s, mid_a+a
+                    mid_t, mid_s, mid_a = mid_t/count, mid_s/count, mid_a/count
 
                     vid_chunk_g = vid_chunk_g.to(device)
                     tem_feat_g = tem_feat_g.to(device)
@@ -266,14 +211,7 @@ def main(config):
                         a = (a + am) / 2
                     else:
                         t, s, a = model(vid_chunk_g, tem_feat_g, spa_feat_g, prmt)
-
-                    mid_t = (mid_t + t.squeeze(1))/2
-                    mid_s = (mid_s + s.squeeze(1))/2
-                    mid_a = (mid_a + a.squeeze(1))/2
-                    
-                    Tem_y[i] = mid_t.to('cpu')
-                    Spa_y[i] = mid_s.to('cpu')
-                    Ali_y[i] = mid_a.to('cpu')
+                    Tem_y[i], Spa_y[i], Ali_y[i] = (mid_t + t)/2, (mid_s + s)/2, (mid_a + a)/2
 
                 # tPLCC_b, tSRCC_b, tKRCC_b, tRMSE_b = performance_fit(
                 #     label[:,0], Tem_y[:,0])
@@ -302,13 +240,13 @@ def main(config):
                 # aPLCC_st, aSRCC_st, aKRCC_st, aRMSE_st = performance_fit(
                 #     label[:,0], Ali_y[:,3])
 
-                sPLCC_b, sSRCC_b, sKRCC_b, sRMSE_b = performance_fit(
+                PLCC_b, SRCC_b, KRCC_b, RMSE_b = performance_fit(
                     label[:,0], (Tem_y[:,0]+Spa_y[:,0])/2)
-                sPLCC_t, sSRCC_t, sKRCC_t, sRMSE_t = performance_fit(
+                PLCC_t, SRCC_t, KRCC_t, RMSE_t = performance_fit(
                     label[:,0], (Tem_y[:,1]+Spa_y[:,1])/2)
-                sPLCC_s, sSRCC_s, sKRCC_s, sRMSE_s = performance_fit(
+                PLCC_s, SRCC_s, KRCC_s, RMSE_s = performance_fit(
                     label[:,0], (Tem_y[:,2]+Spa_y[:,2])/2)
-                sPLCC_st, sSRCC_st, sKRCC_st, sRMSE_st = performance_fit(
+                PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
                     label[:,0], (Tem_y[:,3]+Spa_y[:,3])/2)    
 
                 
@@ -324,14 +262,16 @@ def main(config):
                 # print(
                 #     'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_st))
                 # print('===============Spa==============')
-                print(
-                    'Epoch {} completed. base val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_b))
-                print(
-                    'Epoch {} completed. S val: SRCC: {:.4f}'.format( epoch + 1,sSRCC_s))
-                print(
-                    'Epoch {} completed. T val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_t))
-                print(
-                    'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_st))
+                print(f'Epoch {epoch+1} completed.')
+                # print('===')
+                print('base: {:.4f}\nT: {:.4f}\nS: {:.4f}\nST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+                    SRCC_b ,SRCC_t ,SRCC_s, SRCC_st, KRCC_st, PLCC_st, RMSE_st))
+                print('===')
+                # print('S val: SRCC: {:.4f}'.format( epoch + 1,sSRCC_s))
+                # print(
+                #     'Epoch {} completed. T val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_t))
+                # print(
+                #     'Epoch {} completed. ST val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_st))
 
                 # print('===============Ali==============')
                 # print(
@@ -347,19 +287,25 @@ def main(config):
                 
         # ===================
         # save model
-                if sSRCC_st > best_val_criterion:
-                    print(
-                        "Update best model using best_val_criterion in epoch {}".format(epoch + 1))
-                    best_val_criterion = sSRCC_st
-                    best_val_st = [sSRCC_st,sKRCC_st,
-                                    sPLCC_st,sRMSE_st]
+                if SRCC_st > best_val_criterion:
+                    best_val_criterion = SRCC_st
+                    best_val_st = [SRCC_st,KRCC_st,
+                                    PLCC_st,RMSE_st]
                                     # aSRCC_st,aKRCC_st,
                                     # aPLCC_st,aRMSE_st]
 
                     if opt["save_model"] == True:
-                        print('Saving model...')
-                        torch.save(model.state_dict(), f'ckpts/{loop}_{epoch}.pth')
+                        print(f'Save model using {epoch+1}th/{opt["epochs"]} training result')
+                        torch.save(model.state_dict(), f'ckpts/{loop}.pth')
+                print('the best SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
+                    best_val_st[0], best_val_st[1], best_val_st[2], best_val_st[3]))
+                
+                
+            
 
+            
+            
+            
         print('Training completed.')    
         # print('===============BSET tem==============')
         print(

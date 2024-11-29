@@ -216,6 +216,9 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         s=torch.stack((xs.squeeze(1),qt_s,qs_s,qst_s))
         a=torch.stack((xa.squeeze(1),qt_a,qs_a,qst_a))
 
+        # if batch_size == 1, then return shape[4] directly
+        if(x_size[0]==1):
+            t,s,a = t.squeeze(1).to('cpu'),s.squeeze(1).to('cpu'),a.squeeze(1).to('cpu')
 
         return t, s, a
 
