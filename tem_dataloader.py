@@ -1,3 +1,4 @@
+import glob
 import json
 import os
 from sys import prefix
@@ -23,7 +24,7 @@ class VideoDataset_temporal_slowfast(data.Dataset):
     """Read data from the original dataset for feature extraction"""
 
     def __init__(self, database_name,
-                 data_dir, transform, resize):
+                 data_dir, transform, resize=224):
         super(VideoDataset_temporal_slowfast, self).__init__()
 
         # if database_name == 'KoNViD-1k':
@@ -51,6 +52,16 @@ class VideoDataset_temporal_slowfast(data.Dataset):
             dataInfo = pd.DataFrame(video_names)
             dataInfo.columns = ['file_names']
             self.video_names = dataInfo['file_names']
+        
+        if database_name == 'LGVQ':
+            video_names=glob.glob(f'{data_dir}/*.mp4')            
+            dataInfo = pd.DataFrame(video_names)
+            dataInfo.columns=['file_names']
+            self.video_names = dataInfo['file_names']
+        
+        if database_name == 'T2VQA':
+            self.video_names=glob.glob(f'{data_dir}/*.mp4')
+            
 
         self.videos_dir = data_dir
         self.transform = transform
@@ -60,12 +71,12 @@ class VideoDataset_temporal_slowfast(data.Dataset):
         return len(self.video_names)
 
     def __getitem__(self, idx):
-        video_name = self.video_names.iloc[idx]
-        # video_score = torch.FloatTensor(np.array(float(self.score.iloc[idx]))) / 20
+        # video_name = self.video_names.iloc[idx]
 
-        filename = os.path.join(self.videos_dir, video_name)
+        filename = self.video_names[idx]
+        vid_nm=filename.split('/')[-1][:-4]
+        # print(filename)
 
-        print(filename)
         if filename[-1] == '4':
             cap = cv2.VideoCapture(filename)
             video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -76,22 +87,15 @@ class VideoDataset_temporal_slowfast(data.Dataset):
             frame_duration = cap.info['duration']
             video_frame_rate = int(round(1000/frame_duration))
         else:
-            raise Exception('vid path is not right')
+            raise Exception('not the correct filetype')
 
-        print('len: ', video_length, ' fr: ', video_frame_rate)
-
-        video_second = int(video_length / video_frame_rate)
-        # one clip for one second video
+        video_length_round = video_length if video_length%8==0 else (video_length//8+ 1)*8
         if video_frame_rate == 0:
             raise Exception('no frame detect')
-        # else:
-            # vid_sec_min = int(video_length / video_frame_rate)
-        # vid_sec_min = 1
-        video_length_round=video_second*8 # make vid_len to be a multiple of 8
-
         video_channel = 3
         transformed_frame_all = torch.zeros(
-            [video_length, video_channel, self.resize, self.resize])
+            [video_length_round, video_channel, self.resize, self.resize])
+        print('len: ', video_length_round, ' fr: ', video_frame_rate, ' name: ', vid_nm)
 
         if filename[-1] == '4':
             for i in range(video_length):
@@ -117,12 +121,16 @@ class VideoDataset_temporal_slowfast(data.Dataset):
                     break
         else:
             raise Exception('vid path NOT right')
+        # 0-39 40
+        # 0-32 33 || 33: == 32
+        if video_length_round != video_length:
+            transformed_frame_all[video_length:,:]=transformed_frame_all[video_length-1,:]
         
-        if video_length % 8 != 0 :
-            video_length=video_length_round+8
-            last_8_ele=transformed_frame_all[-8:]
-            transformed_frame_all=transformed_frame_all[:video_length_round]
-            transformed_frame_all=torch.cat((transformed_frame_all,last_8_ele))
+        # if video_length % 8 != 0 :
+        #     video_length=video_length_round+8
+        #     last_8_ele=transformed_frame_all[-8:]
+        #     transformed_frame_all=transformed_frame_all[:video_length_round]
+        #     transformed_frame_all=torch.cat((transformed_frame_all,last_8_ele))
             
         # transformed_video_all = []
 
@@ -157,4 +165,5 @@ class VideoDataset_temporal_slowfast(data.Dataset):
 
         # 8*32*3*224*224
         # print(transformed_video_all[0].shape)
-        return transformed_frame_all  
+        
+        return transformed_frame_all, vid_nm

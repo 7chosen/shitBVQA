@@ -1,6 +1,7 @@
 data/
-ckpts_modular/
+ckpts/
 .vscode/
 *__pycache__
 logs/
-expri.py
+trash/
+bpe_simple_vocab_16e6.txt.gz

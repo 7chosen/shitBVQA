@@ -1,3 +1,4 @@
+import glob
 import torch
 from torchvision import transforms
 import torch.nn as nn
@@ -6,7 +7,7 @@ from PIL import Image
 import os
 import numpy as np
 # import random
-from config import T2V_model
+# from config import T2V_model
 import cv2
 
 
@@ -153,3 +154,54 @@ class VideoDataset(Dataset):
 
         return transformed_video,video_length 
 
+class VideoDataset_LGVQ(Dataset):
+    """Read data from the original dataset for feature extraction"""
+    def __init__(self, database_name, vids_dir,num_levels=6):
+        super(VideoDataset_LGVQ, self).__init__()
+        self.database_name = database_name
+        self.vids_dir = glob.glob(f'{vids_dir}/*.mp4')
+        self.num_levels = num_levels
+        # self.num_frames = num_frame
+
+    def __len__(self):
+        return len((self.vids_dir))
+
+    def __getitem__(self, idx):
+
+        vid_path = self.vids_dir[idx]
+        vid_name = vid_path.split('/')[-1]
+        vid_name=vid_name[:-4]
+        cap=cv2.VideoCapture(vid_path)
+        video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if video_length == 0:
+            raise Exception('no frame in this vid')
+        print(f'total ftame is {video_length}')
+        video_chunk=[]
+        while 1:
+            ret,frame=cap.read()
+            if not ret:
+                break
+            video_chunk.append(frame)
+            
+        video_width = video_chunk[0].shape[0]
+        video_height = video_chunk[0].shape[1]
+        # ##########
+        transformed_video = torch.zeros([video_length*(self.num_levels-1), 3, video_height, video_width])
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        # seed = np.random.randint(0)
+        # np.random.seed(seed)
+        # random.seed(0)
+        for i,extravt_frame in enumerate(video_chunk):
+            gaussian_pyramid,laplacian_pyramid = pyramidsGL(extravt_frame, self.num_levels)
+            _, laplacian_pyramid_resized = resizedpyramids(gaussian_pyramid, 
+                    laplacian_pyramid, self.num_levels, video_width, video_height)
+            for j in range(len(laplacian_pyramid_resized)):
+                lp = laplacian_pyramid_resized[j]
+                lp = cv2.cvtColor(lp, cv2.COLOR_BGR2RGB) # 
+                lp = transform(lp)
+                transformed_video[i*(self.num_levels-1)+j] = lp
+
+        return transformed_video,video_length, vid_name

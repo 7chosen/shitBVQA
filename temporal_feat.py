@@ -7,7 +7,7 @@ from tem_dataloader import VideoDataset_temporal_slowfast
 from torchvision import transforms
 from pytorchvideo.models.hub import slowfast_r50
 import torch.nn as nn
-from config import FETV_T2V_model,FETV_vid_path
+from config import FETV_T2V_model,FETV_vid_path,LGVQ_T2V_model
 
 
 def pack_pathway_output(frames, device):
@@ -65,6 +65,7 @@ class slowfast(torch.nn.Module):
         with torch.no_grad():
             
             # 1*c*frames*h*w
+            # print(x[1].shape)
             x = self.feature_extraction(x)
             
             # 1*256*frames*7*7
@@ -72,7 +73,7 @@ class slowfast(torch.nn.Module):
             fast_feature=x[1].squeeze()
             fast_feature = self.fast_avg_pool(fast_feature)
             fast_feature=torch.unsqueeze(fast_feature,0)
-            print(fast_feature.shape)
+            # print(fast_feature.shape)
 
             # 1*256*frames*1*1
             
@@ -86,56 +87,94 @@ def main(config):
 
     model = model.to(device)
 
-    resize = config.resize
+    # resize = config.resize
 
-    transformations = transforms.Compose([transforms.Resize([resize, resize]), transforms.ToTensor(),
+    transformations = transforms.Compose([transforms.Resize(config.resize,interpolation=transforms.InterpolationMode.BICUBIC), transforms.ToTensor(),
                                           transforms.Normalize(mean=[0.45, 0.45, 0.45],
                                                                std=[0.225, 0.225, 0.225])])
 
     # training data
-    for n,t2vmdl in enumerate(FETV_T2V_model):
+    if config.database == 'FETV':
+        for n,t2vmdl in enumerate(FETV_T2V_model):
+            videos_dir = FETV_vid_path[n]
+            trainset = VideoDataset_temporal_slowfast(config.database,
+                            videos_dir, transformations)
+            # dataloader
+            train_loader = torch.utils.data.DataLoader(trainset, batch_size=1,
+                            shuffle=False, num_workers=config.num_workers)
+            # do validation after each epoch
+            with torch.no_grad():
+                model.eval()
+                for i, (video,_) in enumerate(train_loader):
+                    if not os.path.exists(config.feature_save_folder + f'/{t2vmdl}'):
+                        dir_name = config.feature_save_folder + f'/{t2vmdl}'
+                        os.makedirs(dir_name)
+                    
+                    # print(len(video))
+                    # print(video[0].shape)
+                    # swap channel and vid_length_clip
+                    # B*C*T*H*W
+                    # 1*3*all_frame*224*224
+                    video = video.permute(0, 2, 1, 3, 4)
+                    # print(video.shape)
+                    inputs = pack_pathway_output(video, device)
+                    fast_feature = model(inputs)
+                    np.save(dir_name +'/' + str(i),
+                            fast_feature.to('cpu').numpy())
 
-        videos_dir = FETV_vid_path[n]
-
-        trainset = VideoDataset_temporal_slowfast(config.database,
-                        videos_dir, transformations, resize)
-
-        # dataloader
+    elif config.database == 'LGVQ':
+        for mdl in LGVQ_T2V_model:
+            if not os.path.exists(config.save_folder + f'/{mdl}'):
+                os.makedirs(config.save_folder + '/'+mdl)
+            vid_path='/home/user/Documents/vqadata/LGVQ/videos/'+mdl
+            trainset=VideoDataset_temporal_slowfast(config.database, vid_path,
+                                                    transformations)
+            train_loader = torch.utils.data.DataLoader(trainset, batch_size=1,
+                            shuffle=False, num_workers=config.num_workers)
+            with torch.no_grad():
+                model.eval()
+                for vid,nm in train_loader:
+                    nm=nm[0]
+                    inputs=vid.permute(0,2,1,3,4)
+                    inputs = pack_pathway_output(inputs, device)
+                    fast_feature = model(inputs)
+                    print(fast_feature.shape[2])
+                    
+                    np.save(f'{config.save_folder}/{mdl}/{nm}', fast_feature.to('cpu').numpy())
+                    # break
+            # break
+    elif config.database == 'T2VQA':
+        if not os.path.exists(config.save_folder):
+            os.makedirs(config.save_folder)
+        vid_path='/home/user/Documents/vqadata/T2VQA/videos'
+        trainset=VideoDataset_temporal_slowfast(config.database, vid_path,
+                                                transformations)
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=1,
                         shuffle=False, num_workers=config.num_workers)
-
-        # do validation after each epoch
         with torch.no_grad():
             model.eval()
-            for i, video in enumerate(train_loader):
-                if not os.path.exists(config.feature_save_folder + f'/{t2vmdl}'):
-                    dir_name = config.feature_save_folder + f'/{t2vmdl}'
-                    os.makedirs(dir_name)
-                
-                # print(len(video))
-                # print(video[0].shape)
-                # swap channel and vid_length_clip
-                # B*C*T*H*W
-                # 1*3*all_frame*224*224
-                video = video.permute(0, 2, 1, 3, 4)
-                # print(video.shape)
-                inputs = pack_pathway_output(video, device)
+            for idx,(vid,nm) in enumerate(train_loader):
+                nm=nm[0]
+                print(f'process the {idx} vid')
+                inputs=vid.permute(0,2,1,3,4)
+                inputs = pack_pathway_output(inputs, device)
                 fast_feature = model(inputs)
-                np.save(dir_name +'/' + str(i),
-                        fast_feature.to('cpu').numpy())
-
-        
+                # print(fast_feature.shape[2])
+                
+                np.save(f'{config.save_folder}/{nm}', fast_feature.to('cpu').numpy())          
+                
+                    
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--database', type=str, default='FETV')
+    parser.add_argument('--database', type=str, default='T2VQA')
     parser.add_argument('--num_workers', type=int, default=0)
     parser.add_argument('--resize', type=int, default=224)
     # parser.add_argument('--num_frame', type=int, default=32)
     parser.add_argument('--gpu_ids', type=list, default=None)
-    parser.add_argument('--feature_save_folder', type=str,
-                        default='data/FETV_temporal_all_frames')
+    parser.add_argument('--save_folder', type=str,
+                        default='/home/user/Documents/vqadata/BVQAdata/T2VQA_tem')
 
     config = parser.parse_args()
 

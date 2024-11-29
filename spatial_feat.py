@@ -1,3 +1,4 @@
+import glob
 import torch
 from torchvision import  models
 import torch.nn as nn
@@ -6,29 +7,28 @@ import os
 import numpy as np
 import random
 from argparse import ArgumentParser
-from spatial_dataloader import VideoDataset
-from config import T2V_model
+from spatial_dataloader import VideoDataset,VideoDataset_LGVQ
+from config import LGVQ_T2V_model,FETV_T2V_model
 import scipy.io as scio
 
 
 def exit_folder(folder_name):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
-
-    return
+        # print(1)
     
 class ResNet18_LP(torch.nn.Module):
     """Modified ResNet18 for feature extraction"""
     def __init__(self, layer=2):
         super(ResNet18_LP, self).__init__()
         if layer == 1:
-            self.features = nn.Sequential(*list(models.resnet18(pretrained=True).children())[:-5])
+            self.features = nn.Sequential(*list(models.resnet18(weights=models.ResNet18_Weights.DEFAULT).children())[:-5])
         elif layer == 2:
-            self.features = nn.Sequential(*list(models.resnet18(pretrained=True).children())[:-4])
+            self.features = nn.Sequential(*list(models.resnet18(weights=models.ResNet18_Weights.DEFAULT).children())[:-4])
         elif layer == 3:
-            self.features = nn.Sequential(*list(models.resnet18(pretrained=True).children())[:-3])
+            self.features = nn.Sequential(*list(models.resnet18(weights=models.ResNet18_Weights.DEFAULT).children())[:-3])
         else:
-            self.features = nn.Sequential(*list(models.resnet18(pretrained=True).children())[:-2])
+            self.features = nn.Sequential(*list(models.resnet18(weights=models.ResNet18_Weights.DEFAULT).children())[:-2])
         for p in self.features.parameters():
             p.requires_grad = False 
 
@@ -77,17 +77,16 @@ def get_features(video_data, layer=2, frame_batch_size=10, device='cuda'):
 if __name__ == "__main__":
     parser = ArgumentParser(description='"Extracting Laplacian Pyramids Features using Pre-Trained ResNet-18')
     parser.add_argument("--seed", type=int, default=20241017)
-    parser.add_argument('--database', default='FETV', type=str,
+    parser.add_argument('--database', default='LGVQ', type=str,
                         help='database name (default: KoNViD-1k)')
-    parser.add_argument('--frame_batch_size', type=int, default=64,
+    parser.add_argument('--frame_batch_size', type=int, default=40,
                         help='frame batch size for feature extraction (default: 64)')
     parser.add_argument('--layer', type=int, default=2,
                         help='RN18 layer for feature extraction (default: 2)')
     parser.add_argument('--num_levels', type=int, default=6,
                         help='number of gaussian pyramids')
-    # parser.add_argument('--t2vmodel',type=list,default=['cogvideo','text2video-zero','modelscope-t2v','zeroscope'])
-    # parser.add_argument('--frame_num',type=int,default=8)
-    parser.add_argument('--prompt_num',type=int,default=619)
+
+    # parser.add_argument('--prompt_num',type=int,default=619)
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)  #
@@ -113,7 +112,7 @@ if __name__ == "__main__":
         # video_length_read = 8
 
     elif args.database == 'FETV':
-        for t2vmdl in T2V_model:
+        for t2vmdl in FETV_T2V_model:
             print('========================',t2vmdl)
             vids_dir = f'/home/user/Documents/vqadata/FETV/{t2vmdl}/videos'
             save_folder = f'data/FETV_spatial_all_frames/{t2vmdl}'
@@ -132,4 +131,38 @@ if __name__ == "__main__":
                 for j in range(video_length):
                     img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
                     np.save(os.path.join(save_folder, str(i), str(j)), img_features.to('cpu').numpy())
+    
+    elif args.database == 'LGVQ':
+        for t2vmdl in LGVQ_T2V_model:
+            print('======',t2vmdl,'======')
+            vids_dir = '/home/user/Documents/vqadata/LGVQ/videos/'+t2vmdl
+            save_folder=f'/home/user/Documents/vqadata/BVQAdata/LGVQ_spa/{t2vmdl}'
+            dataset=VideoDataset_LGVQ(args.database, vids_dir, args.num_levels)
+
+            for i in range(468):
+                print(f'process {i}th vid')
+                dt, f_len, nm = dataset[i]
+                features=get_features(dt,args.layer, args.frame_batch_size,device)
+                exit_folder(os.path.join(save_folder,nm))
+                for j in range(f_len):
+                    img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
+                    np.save(os.path.join(save_folder, nm, str(j)), img_features.to('cpu').numpy())
+            
+    elif args.database == 'T2VQA':
+        vids_dir='/home/user/Documents/vqadata/T2VQA/videos'
+        save_folder='/home/user/Documents/vqadata/BVQAdata/T2VQA_spa'
+        dataset=VideoDataset_LGVQ(args.database,vids_dir,args.num_levels)
+        
+        for i in range(len(dataset)):
+            print(f'process {i}th vid')
+            dt, f_len, nm =dataset[i]
+            features=get_features(dt,args.layer, args.frame_batch_size,device)
+
+            exit_folder(os.path.join(save_folder,nm))
+            for j in range(f_len):
+                img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
+                np.save(os.path.join(save_folder, nm, str(j)), img_features.to('cpu').numpy()) 
+        
+            
+
                     
