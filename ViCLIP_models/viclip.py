@@ -114,10 +114,7 @@ class ViCLIP(nn.Module):
             text_feat=text_embeds[i,...]
             sim = (1/self.temp) * visual_feat @ text_feat.t()
             sim_pre=sim
-            
             sim=nn.functional.softmax(sim,dim=0)
-
-            
             x_all.append(sim.unsqueeze(0))
             x_all_presoftmax.append(sim_pre.unsqueeze(0))
         

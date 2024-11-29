@@ -288,7 +288,7 @@ def clip_text_b16(
             pretrained = _MODELS[pretrained]
         else:
             # pretrained = _MODELS["ViT-B/16"]
-            pretrained = "./ckpts_modular/ViCLIP-B_InternVid-FLT-10M.pth"
+            pretrained = "./ckpts/ViCLIP-B_InternVid-FLT-10M.pth"
         logger.info(f"Load pretrained weights from {pretrained}")
         state_dict = torch.load(pretrained, map_location='cpu',weights_only=False)
         mid=state_dict['model']

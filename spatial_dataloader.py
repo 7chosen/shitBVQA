@@ -164,7 +164,7 @@ class VideoDataset_LGVQ(Dataset):
         # self.num_frames = num_frame
 
     def __len__(self):
-        return len(os.listdir(self.vids_dir))
+        return len((self.vids_dir))
 
     def __getitem__(self, idx):
 
@@ -181,7 +181,6 @@ class VideoDataset_LGVQ(Dataset):
             ret,frame=cap.read()
             if not ret:
                 break
-            frame=cv2.resize(frame,(0,0),fx=0.5,fy=0.5)
             video_chunk.append(frame)
             
         video_width = video_chunk[0].shape[0]

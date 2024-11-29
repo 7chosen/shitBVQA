@@ -8,7 +8,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import random
-from train_dataloader import viCLIP_trainDT,viCLIP_vandtDT
+from train_dataloader import viCLIP_trainDT,viCLIP_vandtDT,VideoDataset_train,VideoDataset_val_test
 from modular_utils import performance_fit
 from modular_utils import plcc_loss, plcc_rank_loss
 from torchvision import transforms
@@ -22,10 +22,12 @@ from ViCLIP_models.viclip import ViCLIP
 
 def main(config):
     
-    static = pd.read_csv('logs/static.csv')
+    # static = pd.read_csv('logs/ViTval.csv')
     
     for loop in range(config.total_loop):
         config.exp_version = loop
+        if loop == 0:
+            continue
         print('the %dth round training starts here' % (loop) )
         seed = loop 
 
@@ -108,6 +110,22 @@ def main(config):
                                           prompt_num=config.prompt_num, seed=seed)
             valset = viCLIP_vandtDT(imgs_dir, mosfile,transformations_vandt,'val', config.crop_size,
                                            prompt_num=config.prompt_num, seed=seed)
+        
+        if config.database == 'LGVQ':
+            prompt_num=468
+            imgs_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_frames'
+            tem_feat_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_tem'
+            spa_feat_dir = '/home/user/Documents/vqadata/BVQAdata/LGVQ_spa'
+            mosfile = config.mosfile
+            print('using the mos file: ', mosfile)
+            trainset = VideoDataset_train(config.database, imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
+                                          transformations_train, config.crop_size,
+                                          prompt_num=prompt_num, seed=seed)
+            valset = VideoDataset_val_test(config.database, imgs_dir, tem_feat_dir, spa_feat_dir, mosfile,
+                                           transformations_vandt, 'val', config.crop_size,
+                                           prompt_num=prompt_num, seed=seed)
+                    
+
 
         # dataloader
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=config.train_batch_size,
@@ -127,7 +145,7 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (v_l, prmt, mos) in enumerate(train_loader):
+            for i, (v_l,_,_, prmt, mos) in enumerate(train_loader):
 
                 optimizer.zero_grad()
                 label=[]
@@ -176,7 +194,7 @@ def main(config):
                 Spa_y = np.zeros(len(valset))
                 Ali_y = np.zeros(len(valset))
                 
-                for i, (v_l, v_g, prmt, mos, count) in enumerate(val_loader):
+                for i, (v_l, v_g, _,_,_,_, mos, count, prmt) in enumerate(val_loader):
                     for j in range(len(mos)):
                         label[i][j] = mos[j].item()
                     score=0
@@ -221,8 +239,8 @@ def main(config):
                 aPLCC_b, aSRCC_b, aKRCC_b, aRMSE_b = performance_fit(
                     label[:,2], Ali_y)
                 
-                new_row=[tSRCC_b, sSRCC_b, aSRCC_b]
-                static.loc[len(static)]=new_row
+                # new_row=[tSRCC_b, sSRCC_b, aSRCC_b]
+                # static.loc[len(static)]=new_row
 
                 print('Epoch {} completed.==TEM== base val: SRCC: {:.4f}'.format(epoch + 1,tSRCC_b))
                 print('Epoch {} completed.==SPA== base val: SRCC: {:.4f}'.format(epoch + 1,sSRCC_b))
@@ -239,7 +257,7 @@ def main(config):
                     best_val_b = [tSRCC_b, sSRCC_b, aSRCC_b]
 
                     print('Saving model...')
-                    torch.save(model.state_dict(), f'ckpts_modular/{loop}_{epoch}.pth')
+                    torch.save(model.state_dict(), f'ckpts/{loop}_{epoch}.pth')
 
         print('Training completed.')    
         print(
@@ -247,9 +265,9 @@ def main(config):
                 best_val_b[0], best_val_b[1], best_val_b[2]))
 
         # make a flag in .csv
-        new_row=[0,0,0]
-        static.loc[len(static)]=new_row
-        static.to_csv('logs/static.csv',index=False)
+        # new_row=[0,0,0]
+        # static.loc[len(static)]=new_row
+        # static.to_csv('logs/static.csv',index=False)
 
         # data = {"b":best_val_b,
         #         "s":best_val_s,
@@ -264,23 +282,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # input parameters
-    parser.add_argument('--database', type=str, default='FETV')
+    parser.add_argument('--database', type=str, default='LGVQ')
     parser.add_argument('--model_name', type=str,
                         default='viCLIP')
     parser.add_argument('--feat_len', type=int, default=8)
-    parser.add_argument('--total_loop', type=int, default=5)
-    parser.add_argument('--prompt_num', type=int, default=619)
+    parser.add_argument('--total_loop', type=int, default=10)
+    # parser.add_argument('--prompt_num', type=int, default=619)
     # training parameters
 
     # original 1e-5
-    parser.add_argument('--lr', type=float, default=1e-5)
+    parser.add_argument('--lr', type=float, default=5e-6)
     parser.add_argument('--decay_ratio', type=float, default=0.9)
     parser.add_argument('--decay_interval', type=int, default=2)
     parser.add_argument('--n_trial', type=int, default=0)
     parser.add_argument('--results_path', type=str)
     parser.add_argument('--exp_version', type=int)
     parser.add_argument('--print_samples', type=int, default=1000)
-    parser.add_argument('--train_batch_size', type=int, default=16)
+    parser.add_argument('--train_batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--resize', type=int, default=256)
     parser.add_argument('--crop_size', type=int, default=224)
@@ -294,7 +312,7 @@ if __name__ == '__main__':
     parser.add_argument('--trained_model', type=str, default='none')
     # parser.add_argument('--save_path', type=str)
     parser.add_argument('--mosfile', type=str,
-                        default='data/FETV.csv')
+                        default='/home/user/Documents/vqadata/BVQAdata/LGVQ_sorted.csv')
 
     config = parser.parse_args()
     torch.manual_seed(0)  #

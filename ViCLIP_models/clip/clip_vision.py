@@ -255,7 +255,7 @@ def clip_joint_b16(
             model_name = pretrained
         else:
             # model_name = "CLIP-ViT-B/16"
-            model_name = "./ckpts_modular/ViCLIP-B_InternVid-FLT-10M.pth"
+            model_name = "./ckpts/ViCLIP-B_InternVid-FLT-10M.pth"
         logger.info(f'load pretrained weights from {model_name}')
         # state_dict = torch.load(_MODELS[model_name], map_location='cpu')
         

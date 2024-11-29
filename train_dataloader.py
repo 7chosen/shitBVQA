@@ -35,7 +35,13 @@ class VideoDataset_train(data.Dataset):
             spa_file=data_file.iloc[:,2]
             tem_file=data_file.iloc[:,3]
             ali_file=data_file.iloc[:,4]     
+        elif database == 'T2VQA':
+            name_file=data_file.iloc[:,0]
+            prompt_file = data_file.iloc[:,1]
+            mos_file=data_file.iloc[:,2]
 
+
+        # print(prompt_file[:10])
         random.seed(seed)
         np.random.seed(seed)
         index_rd = np.random.permutation(prompt_num)
@@ -46,20 +52,36 @@ class VideoDataset_train(data.Dataset):
         self.t_feat_name=[]
         self.prompt_name=[]
         self.score=[]
-        
-        for idx in train_index:
-            idx_copy=idx
-            for j in range(len(os.listdir(imgs_dir))):
-                mdl=model_name[idx_copy]
-                
-                self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
-                self.prompt_name.append(prompt_file[idx_copy])
-                
-                self.img_path_dir.append(os.path.join(imgs_dir,mdl,prompt_file[idx_copy]))
-                self.s_feat_name.append(os.path.join(spatialFeat,mdl,prompt_file[idx_copy]))
-                self.t_feat_name.append(os.path.join(temporalFeat,mdl,prompt_file[idx_copy]))
-                idx_copy+=prompt_num
-        
+        if database == 'T2VQA':
+            for idx in train_index:
+                self.score.append([mos_file[idx]])
+                self.prompt_name.append(prompt_file[idx])
+                self.img_path_dir.append(os.path.join(imgs_dir,name_file[idx]))
+                self.s_feat_name.append(os.path.join(spatialFeat,name_file[idx]))
+                self.t_feat_name.append(os.path.join(temporalFeat,name_file[idx]))
+                # idx_copy=idx*10
+                # for j in range(10):
+                #     self.score.append([mos_file[idx_copy]])
+                #     self.prompt_name.append(prompt_file[idx_copy])
+                #     self.img_path_dir.append(os.path.join(imgs_dir,name_file[idx_copy]))
+                #     self.s_feat_name.append(os.path.join(spatialFeat,name_file[idx_copy]))
+                #     self.t_feat_name.append(os.path.join(temporalFeat,name_file[idx_copy]))
+                #     idx_copy+=1
+            
+        else:
+            for idx in train_index:
+                idx_copy=idx
+                for j in range(len(os.listdir(imgs_dir))):
+                    mdl=model_name[idx_copy]
+                    
+                    self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
+                    self.prompt_name.append(prompt_file[idx_copy])
+                    
+                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,prompt_file[idx_copy]))
+                    self.s_feat_name.append(os.path.join(spatialFeat,mdl,prompt_file[idx_copy]))
+                    self.t_feat_name.append(os.path.join(temporalFeat,mdl,prompt_file[idx_copy]))
+                    idx_copy+=prompt_num
+            
         self.crop_size = crop_size
         self.transform = transform
         self.frame_num = frame_num
@@ -156,6 +178,10 @@ class VideoDataset_val_test(data.Dataset):
             spa_file=data_file.iloc[:,2]
             tem_file=data_file.iloc[:,3]
             ali_file=data_file.iloc[:,4] 
+        elif database == 'T2VQA':
+            name_file=data_file.iloc[:,0]
+            prompt_file = data_file.iloc[:,1]
+            mos_file=data_file.iloc[:,2]
         
         random.seed(seed)
         np.random.seed(seed)
@@ -169,33 +195,25 @@ class VideoDataset_val_test(data.Dataset):
         self.prompt_name=[]
         self.score=[]
         
-        if database_name == 'val':
-            for idx in val_index:
-                # str_idx=str(idx)
-                # idx_copy=idx
-                # for j in range(4):
-                #     mdl=model_name[idx_copy]
-                #     self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
-                #     self.prompt_name.append(prompt_file[idx_copy])
+        the_index=val_index if database_name == 'val' else test_index
 
-                #     self.img_path_dir.append(os.path.join(imgs_dir,mdl,str_idx))
-                #     self.s_feat_name.append(os.path.join(spatialFeat,mdl,str_idx))
-                #     self.t_feat_name.append(os.path.join(temporalFeat,mdl,str_idx))
-                #     idx_copy+=prompt_num
-                idx_copy=idx
-                for j in range(len(os.listdir(imgs_dir))):
-                    mdl=model_name[idx_copy]
-                    
-                    self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
-                    self.prompt_name.append(prompt_file[idx_copy])
-                    
-                    self.img_path_dir.append(os.path.join(imgs_dir,mdl,prompt_file[idx_copy]))
-                    self.s_feat_name.append(os.path.join(spatialFeat,mdl,prompt_file[idx_copy]))
-                    self.t_feat_name.append(os.path.join(temporalFeat,mdl,prompt_file[idx_copy]))
-                    idx_copy+=prompt_num
-                    
-        if database_name == 'test':
-            for idx in test_index:
+        if database == 'T2VQA':
+            for idx in the_index:
+                self.score.append([mos_file[idx]])
+                self.prompt_name.append(prompt_file[idx])
+                self.img_path_dir.append(os.path.join(imgs_dir,name_file[idx]))
+                self.s_feat_name.append(os.path.join(spatialFeat,name_file[idx]))
+                self.t_feat_name.append(os.path.join(temporalFeat,name_file[idx]))
+                # idx_copy=idx*10
+                # for j in range(10):
+                #     self.score.append([mos_file[idx_copy]])
+                #     self.prompt_name.append(prompt_file[idx_copy])
+                #     self.img_path_dir.append(os.path.join(imgs_dir,name_file[idx_copy]))
+                #     self.s_feat_name.append(os.path.join(spatialFeat,name_file[idx_copy]))
+                #     self.t_feat_name.append(os.path.join(temporalFeat,name_file[idx_copy]))
+                #     idx_copy+=1
+        else:
+            for idx in the_index:
                 idx_copy=idx
                 for j in range(len(os.listdir(imgs_dir))):
                     mdl=model_name[idx_copy]
