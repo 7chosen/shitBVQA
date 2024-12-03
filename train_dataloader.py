@@ -455,7 +455,6 @@ class Dataset_1mos(data.Dataset):
             for i in range(count):
                 trans_img = []
                 lap_feat = []
-                fast_feature = []
                 select_idx = list(range(start_index, start_index + self.frame_num))
                 for j in select_idx:
                     cur_frame = vid[i].asnumpy()
@@ -465,6 +464,8 @@ class Dataset_1mos(data.Dataset):
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
                 fast_feature = feature_tem[:, :, select_idx, :, :].squeeze().permute(1,0)
+                trans_img=torch.stack(trans_img)
+                lap_feat=torch.stack(lap_feat)
                 img_l.append(trans_img)
                 t_l.append(fast_feature)
                 s_l.append(lap_feat)
@@ -473,7 +474,6 @@ class Dataset_1mos(data.Dataset):
                 count += 1
                 trans_img = []
                 lap_feat = []
-                fast_feature = []
                 for i in range(frame_len-8, frame_len):
                     cur_frame = vid[i].asnumpy()
                     cur_frame = Image.fromarray(cur_frame)
@@ -482,6 +482,9 @@ class Dataset_1mos(data.Dataset):
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
                 fast_feature = feature_tem[:, :, frame_len-9:frame_len-1, :, :].squeeze().permute(1,0)
+                trans_img=torch.stack(trans_img)
+                lap_feat=torch.stack(lap_feat)
+                
                 img_l.append(trans_img)
                 t_l.append(fast_feature)
                 s_l.append(lap_feat)
