@@ -10,7 +10,7 @@ import torch.nn as nn
 import random
 from tqdm import tqdm
 import yaml
-from train_dataloader import VideoDataset_train, VideoDataset_val_test, Dataset_1mos
+from train_dataloader import Dataset_1mos,get_dataset
 from modular_utils import performance_fit, performance_no_fit
 from modular_utils import plcc_loss, plcc_rank_loss
 
@@ -87,34 +87,22 @@ def main(config):
         #             f.write("\n")
         # json.dump(tem,f,indent=4)
 
-        transformations_train = transforms.Compose(
-            [transforms.Resize(opt["resize"], interpolation=transforms.InterpolationMode.BICUBIC),
-             transforms.RandomCrop(opt["crop_size"]),
-             transforms.ToTensor(),
-             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
-        transformations_vandt = transforms.Compose(
-            [transforms.Resize(opt["resize"], interpolation=transforms.InterpolationMode.BICUBIC),
-             transforms.CenterCrop(opt["crop_size"]),
-             transforms.ToTensor(),
-             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
 
         # dataloader
         print('using the mos file: ', opt["dataset"]["T2VQA"]["mos_file"])        
-        # trainset = VideoDataset_train(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
-        #                                     opt["mos_file"], transformations_train, opt["crop_size"],
-        #                                    prompt_num = opt["prompt_num"], seed=loop)
-        # valset = VideoDataset_val_test(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
-        #                                     opt["mos_file"],transformations_vandt, 'val', opt["crop_size"],
-        #                                    prompt_num = opt["prompt_num"], seed=loop)
+        trainset, valset, _ = get_dataset(opt["dataset"],loop)
+            
         
+        # trainset = Dataset_1mos(opt["dataset"]["T2VQA"], 'train', opt["dataset"]["T2VQA"]["vids_dir"], 
+        #                         opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
+        #                                     opt["dataset"]["T2VQA"]["mos_file"], transformations_train,
+        #                                    prompt_num = opt["dataset"]["T2VQA"]["prompt_num"], seed=loop)
+        # valset = Dataset_1mos(opt["dataset"]["T2VQA"], 'val', opt["dataset"]["T2VQA"]["vids_dir"], 
+        #                       opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
+        #                                     opt["dataset"]["T2VQA"]["mos_file"], transformations_vandt,
+        #                                    prompt_num = opt["dataset"]["T2VQA"]["prompt_num"], seed=loop)
         
-        trainset = Dataset_1mos(opt["dataset"]["T2VQA"], 'train', opt["dataset"]["T2VQA"]["vids_dir"], opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
-                                            opt["dataset"]["T2VQA"]["mos_file"], transformations_train, opt["crop_size"],
-                                           prompt_num = opt["dataset"]["T2VQA"]["prompt_num"], seed=loop)
-        valset = Dataset_1mos(opt["dataset"]["T2VQA"], 'val', opt["dataset"]["T2VQA"]["vids_dir"], opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
-                                            opt["dataset"]["T2VQA"]["mos_file"], transformations_vandt, opt["crop_size"],
-                                           prompt_num = opt["dataset"]["T2VQA"]["prompt_num"], seed=loop)
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=opt["train_batch_size"],
                                                    shuffle=True, num_workers=opt["num_workers"], drop_last=True)
         val_loader = torch.utils.data.DataLoader(valset, batch_size=1,
@@ -132,10 +120,11 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
-                    spa_feat, spa_feat_g, mos,count, prmt) in enumerate(tqdm(train_loader,desc='Training...')):
-
+            # for i, (vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
+                    # spa_feat, spa_feat_g, mos,count, prmt) in enumerate(tqdm(train_loader,desc='Training...')):
+            for i, return_list in enumerate(tqdm(train_loader,desc='Training...')):
                 optimizer.zero_grad()
+                print(len(return_list))
                 label=[]
                 for _ in range(len(mos)):
                     label.append(mos[_].to(device).float())
