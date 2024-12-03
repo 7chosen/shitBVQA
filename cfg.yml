@@ -6,12 +6,29 @@ epochs: 30
 save_model: True
 
 # data config
-mos_file: /home/user/Documents/vqadata/BVQAdata/T2VQA.csv
-prompt_num: 10000
-imgs_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_frames
-tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_tem
-spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_spa
-
+dataset:
+	name: LGVQ
+		mos_num: 3
+		mos_file: /home/user/Documents/vqadata/BVQAdata/LGVQ_sorted.csv
+		prompt_num: 468
+		imgs_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_frames
+		tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_tem
+		spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_spa
+	name: FETV
+		mos_num: 3
+		mos_file: /home/user/Documents/vqadata/BVQAdata/FETV.csv
+		prompt_num: 619
+		imgs_dir: /home/user/Documents/vqadata/BVQAdata/FETV_frames
+		tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_tem
+		spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_spa
+	name: T2VQA
+		mos_num: 1
+		mos_file: /home/user/Documents/vqadata/BVQAdata/T2VQA_sorted.csv
+		prompt_num: 1000
+		# imgs_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_frames
+		vids_dir: /home/user/Documents/vqadata/T2VQA/videos
+		tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_tem
+		spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_spa
 
 # model config
 lr: !!float 5e-6

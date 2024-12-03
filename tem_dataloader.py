@@ -123,14 +123,14 @@ class VideoDataset_temporal_slowfast(data.Dataset):
             raise Exception('vid path NOT right')
         # 0-39 40
         # 0-32 33 || 33: == 32
-        if video_length_round != video_length:
-            transformed_frame_all[video_length:,:]=transformed_frame_all[video_length-1,:]
+        # if video_length_round != video_length:
+        #     transformed_frame_all[video_length:,:]=transformed_frame_all[video_length-1,:]
         
-        # if video_length % 8 != 0 :
-        #     video_length=video_length_round+8
-        #     last_8_ele=transformed_frame_all[-8:]
-        #     transformed_frame_all=transformed_frame_all[:video_length_round]
-        #     transformed_frame_all=torch.cat((transformed_frame_all,last_8_ele))
+        if video_length % 8 != 0 :
+            video_length=video_length_round+8
+            last_8_ele=transformed_frame_all[-8:]
+            transformed_frame_all=transformed_frame_all[:video_length_round]
+            transformed_frame_all=torch.cat((transformed_frame_all,last_8_ele))
             
         # transformed_video_all = []
 
