@@ -26,7 +26,7 @@ class Dataset_1mos(data.Dataset):
         index_rd = np.random.permutation(prompt_num)
         train_index = index_rd[0:int(prompt_num*0.7)]
         val_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8)]
-        test_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8):]
+        test_index=index_rd[int(prompt_num*0.8):]
         
         self.vid_path_dir=[]
         self.s_feat_name=[]
@@ -91,6 +91,7 @@ class Dataset_1mos(data.Dataset):
                     start_index=0
                 start_index=random.randint(0,frame_len-self.frame_num-1)                    
                 select_idx = list(range(start_index,start_index+self.frame_num))
+            select_idx=select_idx[:8]            
             for i in select_idx:
                 cur_frame = vid[i].asnumpy()
                 cur_frame = Image.fromarray(cur_frame)
@@ -161,6 +162,7 @@ class Dataset_1mos(data.Dataset):
             s_g=[]
             interval = frame_len // self.frame_num
             select_idx = list(x for x in range(0,frame_len,interval))
+            select_idx=select_idx[:8]            
             for idx,i in enumerate(select_idx):
                 cur_frame = vid[i].asnumpy()
                 cur_frame = Image.fromarray(cur_frame)
@@ -187,7 +189,7 @@ class Dataset_3mos(data.Dataset):
         index_rd = np.random.permutation(prompt_num)
         train_index = index_rd[0:int(prompt_num*0.7)]
         val_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8)]
-        test_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8):]
+        test_index=index_rd[int(prompt_num*0.8):]
         
         if database == 'FETV':
             model_name=data_file.iloc[:,1]
@@ -225,6 +227,7 @@ class Dataset_3mos(data.Dataset):
                 self.s_feat_name.append(os.path.join(spatialFeat,mdl,prompt_file[idx_copy]))
                 self.t_feat_name.append(os.path.join(temporalFeat,mdl,prompt_file[idx_copy]))
                 idx_copy+=prompt_num 
+        
         self.vids_dir=vids_dir
         self.datatype = datatype
         self.transform = transform
@@ -268,6 +271,7 @@ class Dataset_3mos(data.Dataset):
                     start_index=0
                 start_index=random.randint(0,frame_len-self.frame_num-1)                    
                 select_idx = list(range(start_index,start_index+self.frame_num))
+            select_idx=select_idx[:8]
             for i in select_idx:
                 cur_frame = vid[i].asnumpy()
                 cur_frame = Image.fromarray(cur_frame)
@@ -283,6 +287,7 @@ class Dataset_3mos(data.Dataset):
             # self.frame_num * 256
             final_tem=feature_tem[:,:,select_idx,:,:].squeeze().permute(1,0)
                 
+            # print(final_imgs.shape[0])
             return final_imgs, [], final_tem, [], final_spa, [], score, 0, prmt
             
         # val/test
@@ -338,6 +343,7 @@ class Dataset_3mos(data.Dataset):
             s_g=[]
             interval = frame_len // self.frame_num
             select_idx = list(x for x in range(0,frame_len,interval))
+            select_idx=select_idx[:8]
             for idx,i in enumerate(select_idx):
                 cur_frame = vid[i].asnumpy()
                 cur_frame = Image.fromarray(cur_frame)
@@ -366,23 +372,25 @@ def get_dataset(opt,seed):
             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
     
-    trainset=VQAdataset(opt, transformations_train, 'train',seed)
-    valset=VQAdataset(opt, transformations_vandt, 'val',seed)
-    testset=VQAdataset(opt, transformations_vandt, 'test', seed)
+    trainset=VQAdataset(opt["dataset"], transformations_train, 'train',seed)
+    valset=VQAdataset(opt["dataset"], transformations_vandt, 'val',seed)
+    testset=VQAdataset(opt["dataset"], transformations_vandt, 'test', seed)
     return trainset, valset, testset
      
 class VQAdataset(data.Dataset):
     def __init__(self, args, transform, datatype,seed):
         super(VQAdataset,self).__init__()
-        dataset_num=len(args)
+        # dataset_num=len(args)
         dataset=[]
         for key in args:
-            if key["mos_num"] == 3:
-                temset=Dataset_3mos(key,datatype,key["vids_dir"],key["tem_feat_dir"],key["spa_feat_dir"],
-                                    key["mos_file"], transform, key["prompt_num"], seed=seed)
-            elif key["mos_num"] == 1:
-                temset=Dataset_1mos(key,datatype,key["vids_dir"],key["tem_feat_dir"],key["spa_feat_dir"],
-                                key["mos_file"], transform, key["prompt_num"], seed=seed)
+            if args[key]["mos_num"] == 3:
+                temset=Dataset_3mos(key, datatype, args[key]["vids_dir"], 
+                            args[key]["tem_feat_dir"],args[key]["spa_feat_dir"],
+                            args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
+            elif args[key]["mos_num"] == 1:
+                temset=Dataset_1mos(key, datatype, args[key]["vids_dir"], 
+                            args[key]["tem_feat_dir"],args[key]["spa_feat_dir"],
+                            args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
             dataset.append(temset)
         self.dataset=dataset
     

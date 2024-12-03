@@ -28,8 +28,6 @@ def main(config):
     stats = pd.read_csv('logs/ViTval.csv')
 
     for loop in range(opt["split"]):        
-        if loop == 0 :
-            continue
         
         print('the %dth round training starts here' % (loop) )
 
@@ -90,10 +88,7 @@ def main(config):
 
 
         # dataloader
-        print('using the mos file: ', opt["dataset"]["T2VQA"]["mos_file"])        
-        trainset, valset, _ = get_dataset(opt["dataset"],loop)
-            
-        
+        trainset, valset, _ = get_dataset(opt,loop)            
         # trainset = Dataset_1mos(opt["dataset"]["T2VQA"], 'train', opt["dataset"]["T2VQA"]["vids_dir"], 
         #                         opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
         #                                     opt["dataset"]["T2VQA"]["mos_file"], transformations_train,
@@ -108,6 +103,7 @@ def main(config):
         val_loader = torch.utils.data.DataLoader(valset, batch_size=1,
                                                  shuffle=False, num_workers=opt["num_workers"])
 
+        # print(len(train_loader))
         best_val_criterion = -1  # SROCC min
         best_val_b, best_val_s, best_val_t, best_val_st = [], [], [], []
 
@@ -329,39 +325,6 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
-    # # input parameters
-    # parser.add_argument('--database', type=str, default='LGVQ')
-    # parser.add_argument('--model_name', type=str,
-    #                     default='aveScore')
-    # parser.add_argument('--feat_len', type=int, default=8)
-    # parser.add_argument('--total_loop', type=int, default=10)
-    # # training parameters
-
-    # # original 1e-5
-    # parser.add_argument('--lr', type=float, default=5e-6)
-    # parser.add_argument('--decay_ratio', type=float, default=0.9)
-    # parser.add_argument('--decay_interval', type=int, default=2)
-    # # parser.add_argument('--n_trial', type=int, default=0)
-    # # parser.add_argument('--results_path', type=str)
-    # # parser.add_argument('--exp_version', type=int)
-    # parser.add_argument('--print_samples', type=int, default=2000)
-    # parser.add_argument('--train_batch_size', type=int, default=8)
-    # parser.add_argument('--num_workers', type=int, default=16)
-    # parser.add_argument('--resize', type=int, default=256)
-    # parser.add_argument('--crop_size', type=int, default=224)
-    # parser.add_argument('--epochs', type=int, default=30)
-    # # misc
-    # # parser.add_argument('--ckpt_path', type=str, default=None)
-    # # parser.add_argument('--multi_gpu', action='store_true')
-    # # parser.add_argument('--gpu_ids', type=list, default=None)
-    # parser.add_argument('--loss_type', type=str, default='plcc')
-    # parser.add_argument('--trained_model', type=str, default='none')
-    # parser.add_argument('--save_model',action='store_true')
-    # parser.add_argument('--mosfile', type=str,
-    #                     default='/home/user/Documents/vqadata/BVQAdata/T2VQA.csv')
-
-
     parser.add_argument(
         "-o", "--opt", type=str, default="./cfg.yml", help="the option file"
     )
