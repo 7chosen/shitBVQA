@@ -162,7 +162,8 @@ def main(config):
                 # print(fast_feature.shape[2])
                 
                 np.save(f'{config.save_folder}/{nm}', fast_feature.to('cpu').numpy())          
-                
+                # break
+            
                     
 
 

@@ -10,7 +10,7 @@ import torch.nn as nn
 import random
 from tqdm import tqdm
 import yaml
-from train_dataloader import VideoDataset_train, VideoDataset_val_test
+from train_dataloader import VideoDataset_train, VideoDataset_val_test, Dataset_1mos
 from modular_utils import performance_fit, performance_no_fit
 from modular_utils import plcc_loss, plcc_rank_loss
 
@@ -100,13 +100,21 @@ def main(config):
 
 
         # dataloader
-        print('using the mos file: ', opt["mos_file"])        
-        trainset = VideoDataset_train(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
-                                            opt["mos_file"], transformations_train, opt["crop_size"],
-                                           prompt_num = opt["prompt_num"], seed=loop)
-        valset = VideoDataset_val_test(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
-                                            opt["mos_file"],transformations_vandt, 'val', opt["crop_size"],
-                                           prompt_num = opt["prompt_num"], seed=loop)
+        print('using the mos file: ', opt["dataset"]["T2VQA"]["mos_file"])        
+        # trainset = VideoDataset_train(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
+        #                                     opt["mos_file"], transformations_train, opt["crop_size"],
+        #                                    prompt_num = opt["prompt_num"], seed=loop)
+        # valset = VideoDataset_val_test(opt["database"], opt["imgs_dir"], opt["tem_feat_dir"], opt["spa_feat_dir"], 
+        #                                     opt["mos_file"],transformations_vandt, 'val', opt["crop_size"],
+        #                                    prompt_num = opt["prompt_num"], seed=loop)
+        
+        
+        trainset = Dataset_1mos(opt["dataset"]["T2VQA"], 'train', opt["dataset"]["T2VQA"]["vids_dir"], opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
+                                            opt["dataset"]["T2VQA"]["mos_file"], transformations_train, opt["crop_size"],
+                                           prompt_num = opt["dataset"]["T2VQA"]["prompt_num"], seed=loop)
+        valset = Dataset_1mos(opt["dataset"]["T2VQA"], 'val', opt["dataset"]["T2VQA"]["vids_dir"], opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
+                                            opt["dataset"]["T2VQA"]["mos_file"], transformations_vandt, opt["crop_size"],
+                                           prompt_num = opt["dataset"]["T2VQA"]["prompt_num"], seed=loop)
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=opt["train_batch_size"],
                                                    shuffle=True, num_workers=opt["num_workers"], drop_last=True)
         val_loader = torch.utils.data.DataLoader(valset, batch_size=1,
@@ -124,7 +132,8 @@ def main(config):
             batch_losses = []
             batch_losses_each_disp = []
             session_start_time = time.time()
-            for i, (vid_chunk, tem_feat, spa_feat, prmt, mos) in enumerate(tqdm(train_loader,desc='Training...')):
+            for i, (vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
+                    spa_feat, spa_feat_g, mos,count, prmt) in enumerate(tqdm(train_loader,desc='Training...')):
 
                 optimizer.zero_grad()
                 label=[]

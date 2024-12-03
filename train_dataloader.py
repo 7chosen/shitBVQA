@@ -388,7 +388,7 @@ class Dataset_1mos(data.Dataset):
                 idx_copy+=1
         self.vids_dir=vids_dir
         self.datatype = datatype
-        self.crop_size = crop_size
+        # self.crop_size = crop_size
         self.transform = transform
         self.frame_num = frame_num
 
@@ -397,10 +397,11 @@ class Dataset_1mos(data.Dataset):
 
     def __getitem__(self, idx):
         
-        score=torch.FloatTensor(self.score[idx])
+        score=torch.FloatTensor(np.array(float(self.score[idx])))
         prmt=self.prompt_name[idx]
         vid_path = self.vid_path_dir[idx]+'.mp4'
         vid = decord.VideoReader(vid_path)
+        # print(vid_path)
         frame_len=len(vid)
         
         if frame_len < self.frame_num:
@@ -419,16 +420,17 @@ class Dataset_1mos(data.Dataset):
             # global sample
             if flag == 0:
                 interval = frame_len // self.frame_num
-                select_idx = list([x] for x in range(0,frame_len,interval))
+                select_idx = list(x for x in range(0,frame_len,interval))
             # local sample
             else:
                 if frame_len-1-self.frame_num < 0:
                     start_index=0
                 start_index=random.randint(0,frame_len-self.frame_num-1)                    
                 select_idx = list(range(start_index,start_index+self.frame_num))
- 
-            for idx,i in enumerate(select_idx):
-                cur_frame = self.transform(vid[i])
+            for i in select_idx:
+                cur_frame = vid[i].asnumpy()
+                cur_frame = Image.fromarray(cur_frame)
+                cur_frame = self.transform(cur_frame)
                 final_imgs.append(cur_frame)
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 final_spa.append(cur_spa)               
@@ -456,7 +458,9 @@ class Dataset_1mos(data.Dataset):
                 fast_feature = []
                 select_idx = list(range(start_index, start_index + self.frame_num))
                 for j in select_idx:
-                    cur_frame=self.transform(vid[j])
+                    cur_frame = vid[i].asnumpy()
+                    cur_frame = Image.fromarray(cur_frame)
+                    cur_frame = self.transform(cur_frame)
                     trans_img.append(cur_frame)
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
@@ -471,11 +475,13 @@ class Dataset_1mos(data.Dataset):
                 lap_feat = []
                 fast_feature = []
                 for i in range(frame_len-8, frame_len):
-                    cur_frame=self.transform(vid[i])
+                    cur_frame = vid[i].asnumpy()
+                    cur_frame = Image.fromarray(cur_frame)
+                    cur_frame = self.transform(cur_frame)
                     trans_img.append(cur_frame)
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
-                fast_feature = feature_tem[:, :, -8:, :, :].squeeze().permute(1,0)
+                fast_feature = feature_tem[:, :, frame_len-9:frame_len-1, :, :].squeeze().permute(1,0)
                 img_l.append(trans_img)
                 t_l.append(fast_feature)
                 s_l.append(lap_feat)
@@ -487,9 +493,11 @@ class Dataset_1mos(data.Dataset):
             img_g=[]
             s_g=[]
             interval = frame_len // self.frame_num
-            select_idx = list([x] for x in range(0,frame_len,interval))
+            select_idx = list(x for x in range(0,frame_len,interval))
             for idx,i in enumerate(select_idx):
-                cur_frame = self.transform(vid[i])
+                cur_frame = vid[i].asnumpy()
+                cur_frame = Image.fromarray(cur_frame)
+                cur_frame = self.transform(cur_frame)
                 img_g.append(cur_frame)
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 s_g.append(cur_spa)    

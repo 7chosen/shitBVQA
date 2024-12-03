@@ -89,13 +89,12 @@ class VideoDataset_temporal_slowfast(data.Dataset):
         else:
             raise Exception('not the correct filetype')
 
-        video_length_round = video_length if video_length%8==0 else (video_length//8+ 1)*8
+        video_length_round = video_length if video_length%8==0 else (video_length//8 +1 )*8
         if video_frame_rate == 0:
             raise Exception('no frame detect')
         video_channel = 3
         transformed_frame_all = torch.zeros(
             [video_length_round, video_channel, self.resize, self.resize])
-        print('len: ', video_length_round, ' fr: ', video_frame_rate, ' name: ', vid_nm)
 
         if filename[-1] == '4':
             for i in range(video_length):
@@ -123,14 +122,18 @@ class VideoDataset_temporal_slowfast(data.Dataset):
             raise Exception('vid path NOT right')
         # 0-39 40
         # 0-32 33 || 33: == 32
-        # if video_length_round != video_length:
-        #     transformed_frame_all[video_length:,:]=transformed_frame_all[video_length-1,:]
+        if video_length_round != video_length:
+            transformed_frame_all[video_length:,:]=transformed_frame_all[video_length-1,:]
         
-        if video_length % 8 != 0 :
-            video_length=video_length_round+8
-            last_8_ele=transformed_frame_all[-8:]
-            transformed_frame_all=transformed_frame_all[:video_length_round]
-            transformed_frame_all=torch.cat((transformed_frame_all,last_8_ele))
+        # # 1-8 9-16
+        # if video_length % 8 != 0 :
+        #     tmp=transformed_frame_all.clone()
+        #     # print(transformed_frame_all[video_length])
+        #     # video_length=video_length_round+8
+        #     # last_8_ele=transformed_frame_all[video_length-9:video_length-1]
+        #     transformed_frame_all[-8:]=tmp[video_length-9:video_length-1]
+        #     # transformed_frame_all=torch.cat((transformed_frame_all,last_8_ele))
+        print('len: ', transformed_frame_all.shape[0], ' fr: ', video_frame_rate, ' name: ', vid_nm)
             
         # transformed_video_all = []
 
