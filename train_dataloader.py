@@ -371,18 +371,48 @@ def get_dataset(opt,seed):
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
+    trainset=VQAdataset('-', opt["dataset"], transformations_train, 'train',seed)
     
-    trainset=VQAdataset(opt["dataset"], transformations_train, 'train',seed)
-    valset=VQAdataset(opt["dataset"], transformations_vandt, 'val',seed)
-    testset=VQAdataset(opt["dataset"], transformations_vandt, 'test', seed)
-    return trainset, valset, testset
+    val_loader = dict()
+    test_loader = dict()
+    for key in opt["dataset"]:
+        tmp_dataset=VQAdataset(key,opt["dataset"], transformations_vandt,'val',seed)
+        val_loader[key] = torch.utils.data.DataLoader(tmp_dataset)
+        
+    for key in opt["dataset"]:
+        tmp_dataset=VQAdataset(key,opt["dataset"], transformations_vandt,'test',seed)
+        test_loader[key] = torch.utils.data.DataLoader(tmp_dataset)
+    
+    # valset=VQAdataset(opt["dataset"], transformations_vandt, 'val',seed)
+    # testset=VQAdataset(opt["dataset"], transformations_vandt, 'test', seed)
+
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=opt["train_batch_size"],
+                                                   shuffle=True, num_workers=opt["num_workers"], drop_last=True)
+    # val_loader = torch.utils.data.DataLoader(valset, batch_size=1,
+    #                                              shuffle=False, num_workers=opt["num_workers"])
+    # test_loader = torch.utils.data.DataLoader(testset, batch_size=1,
+    #                                              shuffle=False, num_workers=opt["num_workers"])
+    return train_loader, val_loader, test_loader
      
 class VQAdataset(data.Dataset):
-    def __init__(self, args, transform, datatype,seed):
+    def __init__(self, specified, args, transform, datatype, seed):
         super(VQAdataset,self).__init__()
-        # dataset_num=len(args)
-        dataset=[]
-        for key in args:
+
+
+        dataset=dict()
+        if specified == '':
+            for key in args:
+                if args[key]["mos_num"] == 3:
+                    temset=Dataset_3mos(key, datatype, args[key]["vids_dir"], 
+                                args[key]["tem_feat_dir"],args[key]["spa_feat_dir"],
+                                args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
+                elif args[key]["mos_num"] == 1:
+                    temset=Dataset_1mos(key, datatype, args[key]["vids_dir"], 
+                                args[key]["tem_feat_dir"],args[key]["spa_feat_dir"],
+                                args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
+                dataset[key]=temset
+        else:
+            key=specified
             if args[key]["mos_num"] == 3:
                 temset=Dataset_3mos(key, datatype, args[key]["vids_dir"], 
                             args[key]["tem_feat_dir"],args[key]["spa_feat_dir"],
@@ -391,16 +421,20 @@ class VQAdataset(data.Dataset):
                 temset=Dataset_1mos(key, datatype, args[key]["vids_dir"], 
                             args[key]["tem_feat_dir"],args[key]["spa_feat_dir"],
                             args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
-            dataset.append(temset)
-        self.dataset=dataset
-    
+            dataset[key]=temset
+        self.dataset = dataset
+        self.datatype = datatype
+        
+        
     def __len__(self):
-        return min(len(x) for x in self.dataset)
+        return max(len(v) for k,v in self.dataset.items())
     
     def __getitem__(self,idx):
+        
         return_list=[]
-        for dataset in self.dataset:
-            return_list.append(dataset[idx])
+        for key,dataset in self.dataset.items():
+            length=len(dataset)
+            return_list.append(dataset[idx%length])
         return return_list
         
         
