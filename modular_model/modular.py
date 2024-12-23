@@ -968,12 +968,6 @@ class ViTbCLIP_exp(torch.nn.Module):
         self.image_processor = image_processor
         self.conv_mode="mplug_owl2"
         
-        # ViT_B_16, _ = clip.load("ViT-B/16")
-
-        # # clip_vit_b_pretrained_features = ViT_B_16.visual
-        # # self.feature_extraction = clip_vit_b_pretrained_features
-        
-        # self.clip=ViT_B_16
         self.feat_len = feat_len
         self.dropout_sp = dropout_sp
         self.dropout_tp = dropout_tp
@@ -1016,9 +1010,6 @@ class ViTbCLIP_exp(torch.nn.Module):
         x_size = x.shape        
         ret=torch.zeros(x_size[0])
         for i in range(x_size[0]):
-            # print(x[i].shape)
-            # image=[tmp for tmp in x[i]]
-            # image_tensor = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'].half()
             image_tensor = x[i]
             conv = conv_templates[self.conv_mode].copy()
             inp = random.choice(strings) + prmt[i] + '\n' + DEFAULT_IMAGE_TOKEN
