@@ -44,7 +44,7 @@ class Dataset_1mos(data.Dataset):
         for idx in final_idx:
             idx_copy=idx*10
             for j in range(10):
-                self.score.append(mos_file[idx_copy])
+                self.score.append([mos_file[idx_copy]])
                 self.prompt_name.append(prompt_file[idx_copy])
                 self.vid_path_dir.append(os.path.join(vids_dir,name_file[idx_copy]))
                 self.s_feat_name.append(os.path.join(spatialFeat,name_file[idx_copy]))
@@ -61,7 +61,10 @@ class Dataset_1mos(data.Dataset):
 
     def __getitem__(self, idx):
         
-        score=torch.FloatTensor(np.array(float(self.score[idx])))
+        # score=torch.FloatTensor(np.array(float(self.score[idx])))
+        score=self.score[idx]
+        for ele in score:
+            ele=torch.FloatTensor(np.array(float(ele)))
         prmt=self.prompt_name[idx]
         vid_path = self.vid_path_dir[idx]+'.mp4'
         vid = decord.VideoReader(vid_path)
@@ -106,6 +109,7 @@ class Dataset_1mos(data.Dataset):
             final_spa=torch.stack(final_spa)
             # self.frame_num * 256
             final_tem=feature_tem[:,:,select_idx,:,:].squeeze().permute(1,0)
+            # print(score)
                 
             return final_imgs, [], final_tem, [], final_spa, [], score, 0, prmt
             
@@ -267,9 +271,10 @@ class Dataset_3mos(data.Dataset):
                 select_idx = list(x for x in range(0,frame_len,interval))
             # local sample
             else:
-                if frame_len-1-self.frame_num < 0:
+                if frame_len-1-self.frame_num <= 0:
                     start_index=0
-                start_index=random.randint(0,frame_len-self.frame_num-1)                    
+                else:
+                    start_index=random.randint(0,frame_len-self.frame_num-1)                    
                 select_idx = list(range(start_index,start_index+self.frame_num))
             select_idx=select_idx[:8]
             for i in select_idx:
@@ -371,7 +376,7 @@ def get_dataset(opt,seed):
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
-    trainset=VQAdataset('-', opt["dataset"], transformations_train, 'train',seed)
+    trainset=VQAdataset('', opt["dataset"], transformations_train, 'train',seed)
     
     val_loader = dict()
     test_loader = dict()

@@ -1,5 +1,9 @@
 database: T2VQA
-model: aveScore
+model: exp
+model_path: /home/user/Documents/vqadata/t2vqa_qalign
+model_base: 
+
+# model: aveScore
 feat_len: 8
 split: 10
 epochs: 30
@@ -25,7 +29,6 @@ dataset:
     mos_num: 1
     mos_file: ./data/T2VQA.csv
     prompt_num: 1000
-    # imgs_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_frames
     vids_dir: /home/user/Documents/vqadata/T2VQA/videos
     tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_tem
     spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_spa
@@ -35,15 +38,15 @@ lr: !!float 5e-6
 decay_ratio: !!float 0.9
 decay_interval: 2
 print_samples: 2000
-train_batch_size: 8
-num_workers: 16
+train_batch_size: 16
+num_workers: 8
 loss_type: plcc
 
 
-resize: 256
-crop_size: 224
+resize: 512
+crop_size: 448
 
-pretrained_weights: none
+pretrained_weights: 
 
         
         

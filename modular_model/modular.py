@@ -1,8 +1,18 @@
+from collections import defaultdict
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+import random
 import torch
 import torch.nn as nn
 import torchvision.models as models
 import clip
 from itertools import product
+
+from q_align.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
+from q_align.conversation import conv_templates, SeparatorStyle
+from q_align.model.builder import load_pretrained_model
+from q_align.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 
 qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
 
@@ -919,38 +929,63 @@ class ViTbCLIP_SpatialTemporal_dropout_old(torch.nn.Module):
         
         # return x, qt, qs, qst
         return t, s, a
-    
-class ViTbCLIP_exp(torch.nn.Module):
-    def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
-        super(ViTbCLIP_exp, self).__init__()
-        ViT_B_16, _ = clip.load("ViT-B/16")
 
-        # clip_vit_b_pretrained_features = ViT_B_16.visual
-        # self.feature_extraction = clip_vit_b_pretrained_features
+
+strings = [
+    "How would you judge the quality of this video? ",
+    "Can you rate the quality of this video? ",
+    "Rate the quality of this video. ",
+    "Could you evaluate the quality of this video? ",
+    "What do you think about the quality of this video? ",
+    "What is your quality rating for this video? ",
+    "How would you rate the quality of this video? ",
+    "How do you assess the quality of this video? ",
+    "What's your opinion on the quality of this video? "
+]
+def wa5(logits):
+    import numpy as np
+    logprobs = np.array([logits["excellent"], logits["good"], logits["fair"], logits["poor"], logits["bad"]])
+    probs = np.exp(logprobs) / np.sum(np.exp(logprobs))
+    return np.inner(probs, np.array([1,0.75,0.5,0.25,0.]))
+def disable_torch_init():
+    """
+    Disable the redundant torch default initialization to accelerate model creation.
+    """
+    import torch
+    setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
+    setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
+
+class ViTbCLIP_exp(torch.nn.Module):
+    def __init__(self, model_path, model_base, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
+        super(ViTbCLIP_exp, self).__init__()
+        disable_torch_init()
+        model_name = get_model_name_from_path(model_path)
+        tokenizer, model, image_processor, context_len = \
+            load_pretrained_model(model_path, model_base, model_name)
         
-        self.clip=ViT_B_16
+        self.tokenizer = tokenizer
+        self.model = model 
+        self.image_processor = image_processor
+        self.conv_mode="mplug_owl2"
+        
+        # ViT_B_16, _ = clip.load("ViT-B/16")
+
+        # # clip_vit_b_pretrained_features = ViT_B_16.visual
+        # # self.feature_extraction = clip_vit_b_pretrained_features
+        
+        # self.clip=ViT_B_16
         self.feat_len = feat_len
         self.dropout_sp = dropout_sp
         self.dropout_tp = dropout_tp
 
         self.spatialRec1 = self.spatial_rectifier(5*256*self.feat_len, self.dropout_sp)
         self.spatialRec2 = self.spatial_rectifier(5*256*self.feat_len, self.dropout_sp)
+        self.spatialRec3 = self.spatial_rectifier(5*256*self.feat_len, self.dropout_sp)
 
         self.temporalRec1 = self.temporal_rectifier((256)*self.feat_len, self.dropout_tp)  # Fast:256  Slow:2048
         self.temporalRec2 = self.temporal_rectifier((256)*self.feat_len, self.dropout_tp)  # Fast:256  Slow:2048
         self.temporalRec3 = self.temporal_rectifier((256)*self.feat_len, self.dropout_tp)  # Fast:256  Slow:2048
 
-        self.spa_norm=nn.LayerNorm(1280)
-        self.tem_norm=nn.LayerNorm(256)
-        
-        self.idk=self.idk_rectifier(1280*8,0.2)
-        self.tem_idk=self.idk_rectifier(8*256,0.2)
-        
-        self.spa_idk2=self.idk2_rectifier(512,0.2)
-        self.tem_idk2=self.idk2_rectifier(512,0.2)
-        self.spa_att = nn.MultiheadAttention(512,8,dropout=0.2)
-        self.tem_att = nn.MultiheadAttention(512,8,dropout=0.2)
-        # self.lin = nn.Linear(8*1280,512)
 
         self.sr = sr
         self.tr = tr
@@ -976,199 +1011,94 @@ class ViTbCLIP_exp(torch.nn.Module):
             nn.Dropout(p=dropout_tp),
         )
         return regression_block
-
-    def idk_rectifier(self, in_channels, dropout_tp):
-        regression_block = nn.Sequential(
-            nn.Linear(in_channels, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.Dropout(p=dropout_tp),
-        )
-        return regression_block
-    def idk2_rectifier(self, in_channels, dropout_tp):
-        regression_block = nn.Sequential(
-            nn.Linear(in_channels,2),
-            nn.ReLU(),
-            nn.Dropout(p=dropout_tp),
-        )
-        return regression_block
-    
     
     def forward(self, x, tem_feat, spa_feat, prmt):
-        # x: (batch * frames) x 3-channel x height x width
-        # eg. 128*3*224*224
-        x_size = x.shape
-        x = x.view(-1, x_size[2], x_size[3], x_size[4])
-        image_features = self.clip.encode_image(x)
-        # (batch_size*frame_num) * 512
-
-        image_features = image_features / image_features.norm(dim=1, keepdim=True)
-        # bs * frames * 512
-        image_features = image_features.view(x_size[0], x_size[1], -1)
-
-        logit_scale = self.clip.logit_scale.exp()
-
-        # Encode text features
-    
-        spa_texts=[]
-        tem_texts=[]
-        ali_texts=[]
-        for i in range(len(prmt)):
-            spa_texts.append(clip.tokenize([f'a photo with {q} spatial quality, which matches {prmt[i]}' for q in qualitys]))
-            tem_texts.append(clip.tokenize([f'a photo with {q} temporal quality, which matches {prmt[i]}' for q in qualitys]))
-            ali_texts.append(clip.tokenize([f'a photo with {q} alignment quality, which matches {prmt[i]}' for q in qualitys]))
-        # bs*5*77
-        spa_texts=torch.stack(spa_texts)
-        spa_texts=spa_texts.view(-1,spa_texts.shape[2])
-        tem_texts=torch.stack(tem_texts)
-        tem_texts=tem_texts.view(-1,tem_texts.shape[2]) 
-        ali_texts=torch.stack(ali_texts)
-        ali_texts=ali_texts.view(-1,ali_texts.shape[2])
-        
-        s_text_features = self.clip.encode_text(spa_texts.to(x.device))
-        t_text_features = self.clip.encode_text(tem_texts.to(x.device))
-        a_text_features = self.clip.encode_text(ali_texts.to(x.device))
-        # print(a_text_features.shape)
-        # Normalize text features
-        s_text_features = s_text_features / s_text_features.norm(dim=1, keepdim=True)
-        t_text_features = t_text_features / t_text_features.norm(dim=1, keepdim=True)
-        a_text_features = a_text_features / a_text_features.norm(dim=1, keepdim=True)
-        # b_s * 5 * 512
-        s_text_features=s_text_features.view(x_size[0],-1,s_text_features.shape[1])
-        t_text_features=t_text_features.view(x_size[0],-1,t_text_features.shape[1])
-        a_text_features=a_text_features.view(x_size[0],-1,a_text_features.shape[1])
-
-        # Compute cosine similarity as logits
-        xs_all=[]
-        xt_all=[]
-        xa_all=[]
+        x_size = x.shape        
+        ret=torch.zeros(x_size[0])
         for i in range(x_size[0]):
-            visual_feat = image_features[i, ...]
+            # print(x[i].shape)
+            # image=[tmp for tmp in x[i]]
+            # image_tensor = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'].half()
+            image_tensor = x[i]
+            conv = conv_templates[self.conv_mode].copy()
+            inp = random.choice(strings) + prmt[i] + '\n' + DEFAULT_IMAGE_TOKEN
+            conv.append_message(conv.roles[0], inp)
+            conv.append_message(conv.roles[1], None)
+            prompt = conv.get_prompt() + " The quality of the video is"
+            toks = ["good", "poor", "high", "fair", "low", "excellent", "bad", "fine", "moderate", 
+                    "decent", "average", "medium", "acceptable"]
+            ids_ = [id_[1] for id_ in self.tokenizer(toks)["input_ids"]]
 
-            s_text_feat = s_text_features[i, ...]
-            s_cos_sim = logit_scale * visual_feat @ s_text_feat.t()
-            xs=torch.nn.functional.softmax(s_cos_sim,dim=1)
-            # 8*5
-            xs=xs.unsqueeze(0)
-            xs_all.append(xs)
-            
-            t_text_feat = t_text_features[i,...]
-            t_cos_sim = logit_scale * visual_feat @ t_text_feat.t()
-            xt=torch.nn.functional.softmax(t_cos_sim,dim=1)
-            xt=xt.unsqueeze(0)
-            xt_all.append(xt)
-            
-            a_text_feat = a_text_features[i, ...]
-            a_cos_sim = logit_scale * visual_feat @ a_text_feat.t()
-            xa=a_cos_sim.unsqueeze(0)
-            xa_all.append(xa)
-
-        # Weighted sum of outputs
-        # Assuming you want to apply specific weights to the classes
-        xs=torch.cat(xs_all,0)
-        xs=xs.view(-1,xs.size(2))
-        # 64*5
-        xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
-        xs=xs.view(x_size[0],-1)
-        xs=torch.mean(xs,dim=1)
-        
-        xt=torch.cat(xt_all,0)
-        xt=xt.view(-1,xt.size(2))
-        xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]
-        xt=xt.view(x_size[0],-1)
-        xt=torch.mean(xt,dim=1)
-
-        xa=torch.cat(xa_all,0)
-        xa=xa.view(-1,xa.size(2))
-        xa = 1 * xa[:, 0] + 2 * xa[:, 1] + 3 * xa[:, 2] + 4 * xa[:, 3] + 5 * xa[:, 4]
-        xa=xa.view(x_size[0],-1)
-        xa=xa.mean(dim=1)
-
-        
-        assert xa.shape == xs.shape == xt.shape, "shape is not same"
-        xs = xs.unsqueeze(1)
-        xt = xt.unsqueeze(1)
-        xa = xa.unsqueeze(1)
+            input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to('cuda')
+            llddata={}
+            llddata["logits"] = defaultdict(float)
+            with torch.inference_mode():
+                output_logits = self.model(input_ids,
+                    images=[image_tensor])["logits"][:,-1]
+                for tok, id_ in zip(toks, ids_):
+                    llddata["logits"][tok] += output_logits.mean(0)[id_].item()
+                llddata["score"] = wa5(llddata["logits"])
+            ret[i]=llddata["score"]
+        # print(ret.shape)
+        xa=xs=xt=ret.unsqueeze(1)
+        # assert xa.shape == xs.shape == xt.shape, "shape is not same"
         ones = torch.ones_like(xa)
-
-
-        a_text_features=a_text_features.transpose(0,1)
-
         
-        # ============================
         # spatial rectifier
+        if self.sr:
+            lp_size = spa_feat.shape
+            spa_feat = spa_feat.view(lp_size[0], -1)
+            spatial_s = self.spatialRec1(spa_feat)
+            spatial_t = self.spatialRec2(spa_feat)
+            spatial_a = self.spatialRec3(spa_feat)
 
-        # 8*8*1280
-        lp_size = spa_feat.shape
-        spa_tmp=self.spa_norm(spa_feat)
-        spa_tmp = spa_tmp.view(lp_size[0], -1)
-        spa_feat = self.idk(spa_tmp)
-        spa_feat=spa_feat.unsqueeze(0)
-        # 1*8*512 & 25*8*512
-        att_output, _ = self.spa_att(query=a_text_features,key=spa_feat,value=spa_feat)
-        # 5*8*512
-        att_output=att_output.transpose(0,1)
-        # 8*5*512
-        
-        spatial_s = self.spatialRec1(spa_tmp)
-        spatial_t = self.spatialRec2(spa_tmp)
-        spatial_a = self.spa_idk2(att_output)
-        spatial_a = 1 * spatial_a[:, 0] + 2 * spatial_a[:, 1] + 3 * spatial_a[:, 2] + 4 * spatial_a[:, 3] + 5 * spatial_a[:, 4]
-        
-        # batch * 2
+            # ax+b
+            alphaS1 = torch.chunk(spatial_s, 2, dim=1)[0]
+            alphaS1 = torch.add(alphaS1, ones)
+            betaS1 = torch.chunk(spatial_s, 2, dim=1)[1]
 
-        # ax+b
-        alphaS1 = torch.chunk(spatial_s, 2, dim=1)[0]
-        alphaS1 = torch.add(alphaS1, ones)
-        betaS1 = torch.chunk(spatial_s, 2, dim=1)[1]
+            alphaS2 = torch.chunk(spatial_t, 2, dim=1)[0]
+            alphaS2 = torch.add(alphaS2, ones)
+            betaS2 = torch.chunk(spatial_t, 2, dim=1)[1]
 
-        alphaS2 = torch.chunk(spatial_t, 2, dim=1)[0]
-        alphaS2 = torch.add(alphaS2, ones)
-        betaS2 = torch.chunk(spatial_t, 2, dim=1)[1]
-
-        alphaS3 = torch.chunk(spatial_a, 2, dim=1)[0]
-        alphaS3 = torch.add(alphaS3, ones)
-        betaS3 = torch.chunk(spatial_a, 2, dim=1)[1]
-
+            alphaS3 = torch.chunk(spatial_a, 2, dim=1)[0]
+            alphaS3 = torch.add(alphaS3, ones)
+            betaS3 = torch.chunk(spatial_a, 2, dim=1)[1]
+        else:
+            raise Exception('not implement')
+            sa = torch.ones_like(xs)
+            sb = torch.zeros_like(xs)
         qs_s = torch.add(torch.mul(torch.abs(alphaS1), xs), betaS1).squeeze(1)
         qs_t = torch.add(torch.mul(torch.abs(alphaS2), xt), betaS2).squeeze(1)
         qs_a = torch.add(torch.mul(torch.abs(alphaS3), xa), betaS3).squeeze(1)
         # shape batch*(batch*frame_num)
 
-
-# =========================
         # tempotal rectifier
+        if self.tr:
+            x_3D_features_size = tem_feat.shape
+            tem_feat = tem_feat.view(x_3D_features_size[0], -1)
+            temporal_s = self.temporalRec1(tem_feat)
+            temporal_t = self.temporalRec2(tem_feat)
+            temporal_a = self.temporalRec3(tem_feat)
 
-        x_3D_features_size = tem_feat.shape
-        tem_feat=self.tem_norm(tem_feat)
-        tem_feat = tem_feat.view(x_3D_features_size[0], -1)
-        temporal_s = self.temporalRec1(tem_feat)
-        temporal_t = self.temporalRec2(tem_feat)
-        
-        
-        tem_feat=self.tem_idk(tem_feat)
-        tem_feat=tem_feat.unsqueeze(0)
-        att_output,_ = self.tem_att(query=a_text_features,key=spa_feat,value=spa_feat)
-        att_output=att_output.transpose(0,1)
-
-
-        temporal_a = self.tem_idk2(att_output)
-        temporal_a = 1 * temporal_a[:, 0] + 2 * temporal_a[:, 1] + 3 * temporal_a[:, 2] + 4 * temporal_a[:, 3] + 5 * temporal_a[:, 4]
-        # ax+b
-        alphaT1= torch.chunk(temporal_s, 2, dim=1)[0]
-        alphaT1 = torch.add(alphaT1, ones)
-        betaT1 = torch.chunk(temporal_s, 2, dim=1)[1]
+            # ax+b
+            alphaT1= torch.chunk(temporal_s, 2, dim=1)[0]
+            alphaT1 = torch.add(alphaT1, ones)
+            betaT1 = torch.chunk(temporal_s, 2, dim=1)[1]
 
 
-        alphaT2= torch.chunk(temporal_t, 2, dim=1)[0]
-        alphaT2 = torch.add(alphaT2, ones)
-        betaT2 = torch.chunk(temporal_t, 2, dim=1)[1]
+            alphaT2= torch.chunk(temporal_t, 2, dim=1)[0]
+            alphaT2 = torch.add(alphaT2, ones)
+            betaT2 = torch.chunk(temporal_t, 2, dim=1)[1]
 
-        alphaT3= torch.chunk(temporal_a, 2, dim=1)[0]
-        alphaT3 = torch.add(alphaT3, ones)
-        betaT3 = torch.chunk(temporal_a, 2, dim=1)[1]
+            alphaT3= torch.chunk(temporal_a, 2, dim=1)[0]
+            alphaT3 = torch.add(alphaT3, ones)
+            betaT3 = torch.chunk(temporal_a, 2, dim=1)[1]
 
-
+        else:
+            raise Exception('not implement')
+            ta = torch.ones_like(xs)
+            tb = torch.zeros_like(xs)
         qt_s = torch.add(torch.mul(torch.abs(alphaT1), xs), betaT1).squeeze(1)
         qt_t = torch.add(torch.mul(torch.abs(alphaT2), xt), betaT2).squeeze(1)
         qt_a = torch.add(torch.mul(torch.abs(alphaT3), xa), betaT3).squeeze(1)
@@ -1203,5 +1133,8 @@ class ViTbCLIP_exp(torch.nn.Module):
         s=torch.stack((xs.squeeze(1),qt_s,qs_s,qst_s))
         a=torch.stack((xa.squeeze(1),qt_a,qs_a,qst_a))
 
+        # if batch_size == 1, then return shape[4] directly
+        if(x_size[0]==1):
+            t,s,a = t.squeeze(1).to('cpu'),s.squeeze(1).to('cpu'),a.squeeze(1).to('cpu')
 
         return t, s, a

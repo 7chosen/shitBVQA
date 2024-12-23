@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 import argparse
-import json
-import os
 import numpy as np
 import pandas as pd
 import torch
@@ -10,12 +8,8 @@ import torch.nn as nn
 import random
 from tqdm import tqdm
 import yaml
-from train_dataloader import Dataset_1mos,get_dataset
-from modular_utils import performance_fit, performance_no_fit
-from modular_utils import plcc_loss, plcc_rank_loss
-
-from torchvision import transforms
-import time
+from train_dataloader import get_dataset
+from modular_utils import performance_fit, plcc_loss, plcc_rank_loss
 from modular_model import modular
 from torch.amp import GradScaler
 
@@ -42,7 +36,8 @@ def main(config):
         elif opt["model"] == 'old':
             model = modular.ViTbCLIP_SpatialTemporal_dropout_old(feat_len=opt["feat_len"])
         elif opt["model"] == 'exp':
-            model = modular.ViTbCLIP_exp(feat_len=opt["feat_len"])
+            model = modular.ViTbCLIP_exp(opt["model_path"], opt["model_base"],
+                feat_len=opt["feat_len"])
         print('The current model is ' + opt["model"])
 
         # if config.multi_gpu:
@@ -51,7 +46,7 @@ def main(config):
         # else:
         model = model.to(device).float()
         
-        if opt["pretrained_weights"] != 'none':
+        if opt["pretrained_weights"] != None :
             print('loading the pretrained model from ', opt["pretrained_weights"])
             model.load_state_dict(torch.load(opt["pretrained_weights"], weights_only=1))
 
@@ -71,7 +66,7 @@ def main(config):
         elif opt["loss_type"] == 'Huberloss':
             criterion = nn.HuberLoss().to(device)
 
-        model.clip.logit_scale.requires_grad = False
+        # model.clip.logit_scale.requires_grad = False
         param_num = 0
         for param in model.parameters():
             param_num += int(np.prod(param.shape))
@@ -83,27 +78,12 @@ def main(config):
         #             f.write(f"Parameter Name: {name}\n")
         #             # f.write(f"Values: {param.data}\n")
         #             f.write("\n")
-        # json.dump(tem,f,indent=4)
 
 
 
         # dataloader
         train_loader, val_loader, _ = get_dataset(opt,loop)            
-        # trainset = Dataset_1mos(opt["dataset"]["T2VQA"], 'train', opt["dataset"]["T2VQA"]["vids_dir"], 
-        #                         opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
-        #                                     opt["dataset"]["T2VQA"]["mos_file"], transformations_train,
-        #                                    prompt_num = opt["dataset"]["T2VQA"]["prompt_num"], seed=loop)
-        # valset = Dataset_1mos(opt["dataset"]["T2VQA"], 'val', opt["dataset"]["T2VQA"]["vids_dir"], 
-        #                       opt["dataset"]["T2VQA"]["tem_feat_dir"], opt["dataset"]["T2VQA"]["spa_feat_dir"], 
-        #                                     opt["dataset"]["T2VQA"]["mos_file"], transformations_vandt,
-        #                                    prompt_num = opt["dataset"]["T2VQA"]["prompt_num"], seed=loop)
-        
-        # train_loader = torch.utils.data.DataLoader(trainset, batch_size=opt["train_batch_size"],
-        #                                            shuffle=True, num_workers=opt["num_workers"], drop_last=True)
-        # val_loader = torch.utils.data.DataLoader(valset, batch_size=1,
-        #                                          shuffle=False, num_workers=opt["num_workers"])
 
-        # print(len(train_loader))
         best_val_criterion = -1  # SROCC min
         SRCC_st = -1
         best_val_b, best_val_s, best_val_t, best_val_st = [], [], [], []
@@ -114,16 +94,11 @@ def main(config):
         for epoch in range(opt["epochs"]):
             print(f'=== Current epoch: {epoch} ===')
             model.train()
-            batch_losses = []
-            batch_losses_each_disp = []
-            session_start_time = time.time()
-            # for i, (vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
-                    # spa_feat, spa_feat_g, mos,count, prmt) in enumerate(tqdm(train_loader,desc='Training...')):
             for i, return_list in enumerate(tqdm(train_loader,desc='Training...')):
-                optimizer.zero_grad()
                 for _ in return_list:
                     vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
-                        spa_feat, spa_feat_g, mos,count, prmt = _
+                        spa_feat, spa_feat_g, mos, count, prmt = _
+                    # print(mos)
                     label=[]
                     for _ in range(len(mos)):
                         label.append(mos[_].to(device).float())
@@ -134,23 +109,22 @@ def main(config):
                         t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt)
                         if len(mos) == 1:
                             loss = criterion(label[0],(t[3]+s[3])/2)
-                        else:
+                        elif len(mos) == 3:
                             loss = criterion(label[0],t[3]) \
                                 +criterion(label[1],s[3]) \
                                 +criterion(label[2],a[3])
+                        else:
+                            raise Exception('The number of mos is not correct')
                         loss /= len(mos)
 
-                    batch_losses.append(loss.item())
-                    batch_losses_each_disp.append(loss.item())
+                    optimizer.zero_grad()
                     scaler.scale(loss).backward()
                     scaler.step(optimizer)
                     scaler.update()
-                scheduler.step()
-                lr = scheduler.get_last_lr()
-                print('The current learning rate is {:.06f}'.format(lr[0]))
+            scheduler.step()
                 
-        # ======================================
-        # do validation after each epoch
+            # ======================================
+            # do validation after each epoch
             with torch.no_grad():
                 model.eval()
                 for dataname in opt["dataset"]:
@@ -158,9 +132,9 @@ def main(config):
                     Tem_y, Spa_y, Ali_y = [np.zeros([len(valset), 4]) for _ in range(3)]
                     label = np.zeros([len(valset),3])
                     for i, _ in enumerate(tqdm(valset,desc=f"{dataname} validating...")):
+                        
                         vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
-                        spa_feat, spa_feat_g, mos,count, prmt = _
-                
+                        spa_feat, spa_feat_g, mos, count, prmt = _[0]
                         for j in range(len(mos)):
                             label[i][j] = mos[j].item()
                         
@@ -168,17 +142,17 @@ def main(config):
                         mid_t, mid_s, mid_a = [torch.zeros(4) for _ in range(3)]
                         
                         for j in range(count):
-                            vid_chunk[j] = vid_chunk[j].to(device)
-                            tem_feat[j] = tem_feat[j].to(device)
-                            spa_feat[j] = spa_feat[j].to(device)
-                            t, s, a = model(vid_chunk[j], tem_feat[j], spa_feat[j], prmt)
+                            x = vid_chunk[:,j,...].to(device)
+                            y = tem_feat[:,j,...].to(device)
+                            z = spa_feat[:,j,...].to(device)
+                            t, s, a = model(x, y, z, prmt)
                             mid_t, mid_s, mid_a = mid_t+t, mid_s+s, mid_a+a
                         mid_t, mid_s, mid_a = mid_t/count, mid_s/count, mid_a/count
 
-                        vid_chunk_g = vid_chunk_g.to(device)
-                        tem_feat_g = tem_feat_g.to(device)
-                        spa_feat_g = spa_feat_g.to(device)
-                        t, s, a = model(vid_chunk_g, tem_feat_g, spa_feat_g, prmt)
+                        x = vid_chunk_g.to(device)
+                        y = tem_feat_g.to(device)
+                        z = spa_feat_g.to(device)
+                        t, s, a = model(x, y, z, prmt)
                         Tem_y[i], Spa_y[i], Ali_y[i] = (mid_t + t)/2, (mid_s + s)/2, (mid_a + a)/2
 
 

@@ -84,6 +84,8 @@ def plcc_loss(y, y_pred):
     y_pred = (y_pred - m_hat) / (sigma_hat + 1e-8)
     sigma, m = torch.std_mean(y, unbiased=False)
     y = (y - m) / (sigma + 1e-8)
+    # print(y.shape)
+    # print(y_pred.shape)
     loss0 = F.mse_loss(y_pred, y) / 4
     rho = torch.mean(y_pred * y)
     loss1 = F.mse_loss(rho * y_pred, y) / 4
