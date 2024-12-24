@@ -1,4 +1,4 @@
-database: T2VQA
+# database: T2VQA
 model: exp
 model_path: /home/user/Documents/vqadata/t2vqa_qalign
 model_base: 

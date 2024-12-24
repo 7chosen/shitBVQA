@@ -1,14 +1,14 @@
 from collections import defaultdict
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
+import numpy as np
 import random
 import torch
 import torch.nn as nn
 import torchvision.models as models
 import clip
 from itertools import product
-
+import PIL.Image as Image
 from q_align.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
 from q_align.conversation import conv_templates, SeparatorStyle
 from q_align.model.builder import load_pretrained_model
@@ -943,7 +943,7 @@ strings = [
     "What's your opinion on the quality of this video? "
 ]
 def wa5(logits):
-    import numpy as np
+    
     logprobs = np.array([logits["excellent"], logits["good"], logits["fair"], logits["poor"], logits["bad"]])
     probs = np.exp(logprobs) / np.sum(np.exp(logprobs))
     return np.inner(probs, np.array([1,0.75,0.5,0.25,0.]))
@@ -954,6 +954,30 @@ def disable_torch_init():
     import torch
     setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
     setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
+
+def expand2square(pil_img, background_color):
+    # tensor
+    # h*w*c
+    pil_img = pil_img.numpy()
+    if pil_img.max() <= 1.0:
+        # If tensor is normalized (values between 0-1)
+        pil_img = (pil_img * 255).astype(np.uint8)
+    else:
+        # If tensor already has values between 0-255
+        pil_img = pil_img.astype(np.uint8)
+    # Convert to PIL Image
+    pil_img = Image.fromarray(pil_img)
+    width, height = pil_img.size
+    if width == height:
+        return pil_img
+    elif width > height:
+        result = Image.new(pil_img.mode, (width, width), background_color)
+        result.paste(pil_img, (0, (width - height) // 2))
+        return result
+    else:
+        result = Image.new(pil_img.mode, (height, height), background_color)
+        result.paste(pil_img, ((height - width) // 2, 0))
+        return result
 
 class ViTbCLIP_exp(torch.nn.Module):
     def __init__(self, model_path, model_base, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
@@ -1007,19 +1031,19 @@ class ViTbCLIP_exp(torch.nn.Module):
         return regression_block
     
     def forward(self, x, tem_feat, spa_feat, prmt):
-        x_size = x.shape        
-        ret=torch.zeros(x_size[0])
-        for i in range(x_size[0]):
-            image_tensor = x[i]
+
+        # x_size = x.shape        
+        ret=torch.zeros(len(x))
+        for i in range(len(x)):
+            image = [expand2square(img, tuple(int(t*255) for t in self.image_processor.image_mean)) for img in x[i]]
+            image_tensor = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'].half().to('cuda')
             conv = conv_templates[self.conv_mode].copy()
             inp = random.choice(strings) + prmt[i] + '\n' + DEFAULT_IMAGE_TOKEN
             conv.append_message(conv.roles[0], inp)
             conv.append_message(conv.roles[1], None)
             prompt = conv.get_prompt() + " The quality of the video is"
-            toks = ["good", "poor", "high", "fair", "low", "excellent", "bad", "fine", "moderate", 
-                    "decent", "average", "medium", "acceptable"]
+            toks = ["good", "poor", "fair", "bad", "excellent"]
             ids_ = [id_[1] for id_ in self.tokenizer(toks)["input_ids"]]
-
             input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to('cuda')
             llddata={}
             llddata["logits"] = defaultdict(float)

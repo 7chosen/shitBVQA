@@ -19,7 +19,7 @@ def main(config):
     with open(config.opt, "r") as f:
         opt = yaml.safe_load(f)
 
-    stats = pd.read_csv('logs/ViTval.csv')
+    # stats = pd.read_csv('logs/ViTval.csv')
 
     for loop in range(opt["split"]):        
         
@@ -102,7 +102,7 @@ def main(config):
                     label=[]
                     for _ in range(len(mos)):
                         label.append(mos[_].to(device).float())
-                    vid_chunk = vid_chunk.to(device)
+                    # vid_chunk = vid_chunk.to(device)
                     tem_feat = tem_feat.to(device)
                     spa_feat = spa_feat.to(device)
                     with torch.autocast(device_type='cuda', dtype=torch.float16):

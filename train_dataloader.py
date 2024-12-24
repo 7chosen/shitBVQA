@@ -97,14 +97,15 @@ class Dataset_1mos(data.Dataset):
             select_idx=select_idx[:8]            
             for i in select_idx:
                 cur_frame = vid[i].asnumpy()
-                cur_frame = Image.fromarray(cur_frame)
-                cur_frame = self.transform(cur_frame)
+                # cur_frame = Image.fromarray(cur_frame)
+                # cur_frame = self.transform(cur_frame)
+                # final_imgs.append(torch.from_numpy(cur_frame))
                 final_imgs.append(cur_frame)
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 final_spa.append(cur_spa)               
         
             # self.frame_num * 3 * 224 * 224
-            final_imgs=torch.stack(final_imgs)
+            # final_imgs=torch.stack(final_imgs)
             # self.frame_num * (256*5)
             final_spa=torch.stack(final_spa)
             # self.frame_num * 256
@@ -128,7 +129,7 @@ class Dataset_1mos(data.Dataset):
                 for j in select_idx:
                     cur_frame = vid[i].asnumpy()
                     cur_frame = Image.fromarray(cur_frame)
-                    cur_frame = self.transform(cur_frame)
+                    # cur_frame = self.transform(cur_frame)
                     trans_img.append(cur_frame)
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
@@ -146,7 +147,7 @@ class Dataset_1mos(data.Dataset):
                 for i in range(frame_len-8, frame_len):
                     cur_frame = vid[i].asnumpy()
                     cur_frame = Image.fromarray(cur_frame)
-                    cur_frame = self.transform(cur_frame)
+                    # cur_frame = self.transform(cur_frame)
                     trans_img.append(cur_frame)
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
@@ -170,7 +171,7 @@ class Dataset_1mos(data.Dataset):
             for idx,i in enumerate(select_idx):
                 cur_frame = vid[i].asnumpy()
                 cur_frame = Image.fromarray(cur_frame)
-                cur_frame = self.transform(cur_frame)
+                # cur_frame = self.transform(cur_frame)
                 img_g.append(cur_frame)
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 s_g.append(cur_spa)    
@@ -279,14 +280,15 @@ class Dataset_3mos(data.Dataset):
             select_idx=select_idx[:8]
             for i in select_idx:
                 cur_frame = vid[i].asnumpy()
-                cur_frame = Image.fromarray(cur_frame)
-                cur_frame = self.transform(cur_frame)
+                # cur_frame = Image.fromarray(cur_frame)
+                # cur_frame = self.transform(cur_frame)
+                # final_imgs.append(torch.from_numpy(cur_frame))
                 final_imgs.append(cur_frame)
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 final_spa.append(cur_spa)               
         
             # self.frame_num * 3 * 224 * 224
-            final_imgs=torch.stack(final_imgs)
+            # final_imgs=torch.stack(final_imgs)
             # self.frame_num * (256*5)
             final_spa=torch.stack(final_spa)
             # self.frame_num * 256
@@ -310,7 +312,7 @@ class Dataset_3mos(data.Dataset):
                 for j in select_idx:
                     cur_frame = vid[i].asnumpy()
                     cur_frame = Image.fromarray(cur_frame)
-                    cur_frame = self.transform(cur_frame)
+                    # cur_frame = self.transform(cur_frame)
                     trans_img.append(cur_frame)
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
@@ -328,7 +330,7 @@ class Dataset_3mos(data.Dataset):
                 for i in range(frame_len-8, frame_len):
                     cur_frame = vid[i].asnumpy()
                     cur_frame = Image.fromarray(cur_frame)
-                    cur_frame = self.transform(cur_frame)
+                    # cur_frame = self.transform(cur_frame)
                     trans_img.append(cur_frame)
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
@@ -375,6 +377,7 @@ def get_dataset(opt,seed):
             transforms.CenterCrop(opt["crop_size"]),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
+
 
     trainset=VQAdataset('', opt["dataset"], transformations_train, 'train',seed)
     
