@@ -1031,10 +1031,10 @@ class ViTbCLIP_exp(torch.nn.Module):
         return regression_block
     
     def forward(self, x, tem_feat, spa_feat, prmt):
-
-        # x_size = x.shape        
-        ret=torch.zeros(len(x))
-        for i in range(len(x)):
+        
+        x_size = x.shape        
+        ret=torch.zeros(x_size[0]).to('cuda')
+        for i in range(x_size[0]):
             image = [expand2square(img, tuple(int(t*255) for t in self.image_processor.image_mean)) for img in x[i]]
             image_tensor = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'].half().to('cuda')
             conv = conv_templates[self.conv_mode].copy()
@@ -1054,9 +1054,7 @@ class ViTbCLIP_exp(torch.nn.Module):
                     llddata["logits"][tok] += output_logits.mean(0)[id_].item()
                 llddata["score"] = wa5(llddata["logits"])
             ret[i]=llddata["score"]
-        # print(ret.shape)
         xa=xs=xt=ret.unsqueeze(1)
-        # assert xa.shape == xs.shape == xt.shape, "shape is not same"
         ones = torch.ones_like(xa)
         
         # spatial rectifier

@@ -44,7 +44,7 @@ def main(config):
         #     model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
         #     model = model.to(device)
         # else:
-        model = model.to(device).float()
+        model = model.to(device)
         
         if opt["pretrained_weights"] != None :
             print('loading the pretrained model from ', opt["pretrained_weights"])
