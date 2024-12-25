@@ -958,7 +958,7 @@ def disable_torch_init():
 def expand2square(pil_img, background_color):
     # tensor
     # h*w*c
-    pil_img = pil_img.numpy()
+    pil_img = pil_img.cpu().numpy()
     if pil_img.max() <= 1.0:
         # If tensor is normalized (values between 0-1)
         pil_img = (pil_img * 255).astype(np.uint8)
@@ -982,7 +982,7 @@ def expand2square(pil_img, background_color):
 class ViTbCLIP_exp(torch.nn.Module):
     def __init__(self, model_path, model_base, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
         super(ViTbCLIP_exp, self).__init__()
-        disable_torch_init()
+        # disable_torch_init()
         model_name = get_model_name_from_path(model_path)
         tokenizer, model, image_processor, context_len = \
             load_pretrained_model(model_path, model_base, model_name)

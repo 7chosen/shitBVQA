@@ -191,7 +191,7 @@ def main(config):
                 #                 # aPLCC_st,aRMSE_st]
                 if opt["save_model"] == True:
                     print(f'Save model using {epoch}th/{opt["epochs"]} training result')
-                    torch.save(model.state_dict(), f'ckpts/{loop}.pth')
+                    torch.save(model.state_dict(), f'ckpts/{opt["model"]}_{loop}.pth')
             # print('the best SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
             #     best_val_st[0], best_val_st[1], best_val_st[2], best_val_st[3]))
 
