@@ -46,9 +46,9 @@ def main(config):
         # else:
         model = model.to(device)
         
-        if opt["pretrained_weights"] != None :
-            print('loading the pretrained model from ', opt["pretrained_weights"])
-            model.load_state_dict(torch.load(opt["pretrained_weights"], weights_only=1))
+        # if opt["pretrained_weights"] != None :
+        #     print('loading the pretrained model from ', opt["pretrained_weights"])
+        #     model.load_state_dict(torch.load(opt["pretrained_weights"], weights_only=1))
 
         # optimizer
         optimizer = optim.Adam(model.parameters(), lr=opt["lr"], weight_decay=0.0000001)
@@ -106,7 +106,7 @@ def main(config):
                     tem_feat = tem_feat.to(device)
                     spa_feat = spa_feat.to(device)
                     with torch.autocast(device_type='cuda', dtype=torch.float16):
-                        t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt)
+                        t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt, len(mos))
                         if len(mos) == 1:
                             loss = criterion(label[0],(t[3]+s[3])/2)
                         elif len(mos) == 3:
@@ -145,14 +145,14 @@ def main(config):
                             x = vid_chunk[:,j,...].to(device)
                             y = tem_feat[:,j,...].to(device)
                             z = spa_feat[:,j,...].to(device)
-                            t, s, a = model(x, y, z, prmt)
+                            t, s, a = model(x, y, z, prmt, len(mos))
                             mid_t, mid_s, mid_a = mid_t+t, mid_s+s, mid_a+a
                         mid_t, mid_s, mid_a = mid_t/count, mid_s/count, mid_a/count
 
                         x = vid_chunk_g.to(device)
                         y = tem_feat_g.to(device)
                         z = spa_feat_g.to(device)
-                        t, s, a = model(x, y, z, prmt)
+                        t, s, a = model(x, y, z, prmt,len(mos))
                         Tem_y[i], Spa_y[i], Ali_y[i] = (mid_t + t)/2, (mid_s + s)/2, (mid_a + a)/2
 
 
@@ -190,12 +190,15 @@ def main(config):
                 #                 # aSRCC_st,aKRCC_st,
                 #                 # aPLCC_st,aRMSE_st]
                 if opt["save_model"] == True:
+                    print("current SRCC: ", SRCC_st)
                     print(f'Save model using {epoch}th/{opt["epochs"]} training result')
                     torch.save(model.state_dict(), f'ckpts/{opt["model"]}_{loop}.pth')
             # print('the best SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
             #     best_val_st[0], best_val_st[1], best_val_st[2], best_val_st[3]))
 
         print('Training completed.')    
+        del model
+        torch.cuda.empty_cache()
         # print('===============BSET tem==============')
         # print(
         #     'The best training result on the ST validation dataset SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(

@@ -6,7 +6,7 @@ model_base:
 # model: aveScore
 feat_len: 8
 split: 10
-epochs: 10
+epochs: 5
 save_model: True
 
 # data config

@@ -1030,7 +1030,7 @@ class ViTbCLIP_exp(torch.nn.Module):
         )
         return regression_block
     
-    def forward(self, x, tem_feat, spa_feat, prmt):
+    def forward(self, x, tem_feat, spa_feat, prmt, num):
         
         x_size = x.shape        
         ret=torch.zeros(x_size[0]).to('cuda')
@@ -1041,7 +1041,11 @@ class ViTbCLIP_exp(torch.nn.Module):
             inp = random.choice(strings) + prmt[i] + '\n' + DEFAULT_IMAGE_TOKEN
             conv.append_message(conv.roles[0], inp)
             conv.append_message(conv.roles[1], None)
-            prompt = conv.get_prompt() + " The quality of the video is"
+            if num == 1:
+                prompt = conv.get_prompt() + " The quality of the video is"
+            elif num==3:
+                mode=random.choice(["spatial","temporal","alignment"])
+                prompt = conv.get_prompt() + f" The {mode} quality of the video is"
             toks = ["good", "poor", "fair", "bad", "excellent"]
             ids_ = [id_[1] for id_ in self.tokenizer(toks)["input_ids"]]
             input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to('cuda')
