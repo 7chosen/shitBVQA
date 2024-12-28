@@ -1030,35 +1030,82 @@ class ViTbCLIP_exp(torch.nn.Module):
         )
         return regression_block
     
-    def forward(self, x, tem_feat, spa_feat, prmt, num):
+    def forward(self, x, tem_feat, spa_feat, prmt, num, phase="train"):
         
         x_size = x.shape        
-        ret=torch.zeros(x_size[0]).to('cuda')
-        for i in range(x_size[0]):
-            image = [expand2square(img, tuple(int(t*255) for t in self.image_processor.image_mean)) for img in x[i]]
-            image_tensor = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'].half().to('cuda')
-            conv = conv_templates[self.conv_mode].copy()
-            inp = random.choice(strings) + prmt[i] + '\n' + DEFAULT_IMAGE_TOKEN
-            conv.append_message(conv.roles[0], inp)
-            conv.append_message(conv.roles[1], None)
-            if num == 1:
-                prompt = conv.get_prompt() + " The quality of the video is"
-            elif num==3:
-                mode=random.choice(["spatial","temporal","alignment"])
-                prompt = conv.get_prompt() + f" The {mode} quality of the video is"
-            toks = ["good", "poor", "fair", "bad", "excellent"]
-            ids_ = [id_[1] for id_ in self.tokenizer(toks)["input_ids"]]
-            input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to('cuda')
-            llddata={}
-            llddata["logits"] = defaultdict(float)
-            with torch.inference_mode():
-                output_logits = self.model(input_ids,
-                    images=[image_tensor])["logits"][:,-1]
-                for tok, id_ in zip(toks, ids_):
-                    llddata["logits"][tok] += output_logits.mean(0)[id_].item()
-                llddata["score"] = wa5(llddata["logits"])
-            ret[i]=llddata["score"]
-        xa=xs=xt=ret.unsqueeze(1)
+        ret=torch.zeros(x_size[0])
+        x_ast=torch.zeros(x_size[0],3)
+        toks = ["good", "poor", "fair", "bad", "excellent"]
+        ids_ = [id_[1] for id_ in self.tokenizer(toks)["input_ids"]]
+                
+        if phase == 'train':
+            for i in range(x_size[0]):
+                llddata={}
+                llddata["logits"] = defaultdict(float)
+                
+                image = [expand2square(img, tuple(int(t*255) for t in self.image_processor.image_mean)) for img in x[i]]
+                image_tensor = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'].half().to('cuda')
+                
+                conv = conv_templates[self.conv_mode].copy()
+                inp = random.choice(strings) + prmt[i] + '\n' + DEFAULT_IMAGE_TOKEN
+                conv.append_message(conv.roles[0], inp)
+                conv.append_message(conv.roles[1], None)
+                if num == 3:                
+                    mode=random.choice(["spatial","temporal","alignment"])
+                    prompt = conv.get_prompt() + f" The {mode} quality of the video is"
+                elif num==1:
+                    prompt = conv.get_prompt() + " The quality of the video is"
+                input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to('cuda')
+                with torch.inference_mode():
+                    output_logits = self.model(input_ids,
+                        images=[image_tensor])["logits"][:,-1]
+                    for tok, id_ in zip(toks, ids_):
+                        llddata["logits"][tok] += output_logits.mean(0)[id_].item()
+                    llddata["score"] = wa5(llddata["logits"])
+                ret[i]=llddata["score"]   
+            xa=xs=xt=ret.unsqueeze(1)
+        elif phase == 'eval':
+            for i in range(x_size[0]):
+                llddata={}
+                llddata["logits"] = defaultdict(float)
+                
+                image = [expand2square(img, tuple(int(t*255) for t in self.image_processor.image_mean)) for img in x[i]]
+                image_tensor = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'].half().to('cuda')
+                
+                conv = conv_templates[self.conv_mode].copy()
+                inp = random.choice(strings) + prmt[i] + '\n' + DEFAULT_IMAGE_TOKEN
+                conv.append_message(conv.roles[0], inp)
+                conv.append_message(conv.roles[1], None)
+                
+                if num == 3:                
+                    prompt_all = [conv.get_prompt() + f" The {con} quality of the video is" for con in ["spatial","temporal","alignment"]]
+                    for idx,prompt in enumerate(prompt_all):
+                        input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to('cuda')
+                        with torch.inference_mode():
+                            output_logits = self.model(input_ids,
+                                images=[image_tensor])["logits"][:,-1]
+                            for tok, id_ in zip(toks, ids_):
+                                llddata["logits"][tok] += output_logits.mean(0)[id_].item()
+                            llddata["score"] = wa5(llddata["logits"])
+                    x_ast[i][idx]=llddata["score"]
+            
+                if num==1:
+                    prompt = conv.get_prompt() + " The quality of the video is"
+                    input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to('cuda')
+                    with torch.inference_mode():
+                        output_logits = self.model(input_ids,
+                            images=[image_tensor])["logits"][:,-1]
+                        for tok, id_ in zip(toks, ids_):
+                            llddata["logits"][tok] += output_logits.mean(0)[id_].item()
+                        llddata["score"] = wa5(llddata["logits"])
+                    ret[i]=llddata["score"]   
+            if num==3:
+                xt=x_ast[:,0]
+                xs=x_ast[:,1]
+                xa=x_ast[:,2]
+            else:
+                xa=xs=xt=ret.unsqueeze(1)
+        
         ones = torch.ones_like(xa)
         
         # spatial rectifier
