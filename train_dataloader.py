@@ -179,27 +179,25 @@ class Dataset_3mos(data.Dataset):
                 prompt_num, seed=0, frame_num=8):
         super(Dataset_3mos, self).__init__()
         
-        data_file=pd.read_csv(mosfile_path)
+        data_file=pd.read_csv(mosfile_path,dtype={"name":str})
         random.seed(seed)
         np.random.seed(seed)
         index_rd = np.random.permutation(prompt_num)
         train_index = index_rd[0:int(prompt_num*0.7)]
         val_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8)]
         test_index=index_rd[int(prompt_num*0.8):]
-        
         if database == 'FETV':
-            model_name=data_file.iloc[:,1]
-            prompt_file=data_file.iloc[:,2]
+            name_file=data_file.iloc[:,0]
+            prompt_file=data_file.iloc[:,3]
+            spa_file=data_file.iloc[:,4]
+            tem_file=data_file.iloc[:,5]
+            ali_file=data_file.iloc[:,6]
+        elif database == 'LGVQ':
+            name_file=data_file.iloc[:,0]
+            prompt_file = data_file.iloc[:,2]
             spa_file=data_file.iloc[:,3]
             tem_file=data_file.iloc[:,4]
             ali_file=data_file.iloc[:,5]
-        elif database == 'LGVQ':
-            model_name=data_file.iloc[:,0]
-            prompt_file = data_file.iloc[:,1]
-            spa_file=data_file.iloc[:,2]
-            tem_file=data_file.iloc[:,3]
-            ali_file=data_file.iloc[:,4]
-        
         self.vid_path_dir=[]
         self.s_feat_name=[]
         self.t_feat_name=[]
@@ -215,15 +213,16 @@ class Dataset_3mos(data.Dataset):
             
         for idx in final_idx:
             idx_copy=idx
-            for j in range(len(os.listdir(vids_dir))):
-                mdl=model_name[idx_copy]
+            while 1:
+                if idx_copy >= len(os.listdir(vids_dir)):
+                    break
                 self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
                 self.prompt_name.append(prompt_file[idx_copy])
-                self.vid_path_dir.append(os.path.join(vids_dir,mdl,prompt_file[idx_copy]))
-                self.s_feat_name.append(os.path.join(spatialFeat,mdl,prompt_file[idx_copy]))
-                self.t_feat_name.append(os.path.join(temporalFeat,mdl,prompt_file[idx_copy]))
-                idx_copy+=prompt_num 
-        
+                self.vid_path_dir.append(os.path.join(vids_dir,name_file[idx_copy]))
+                self.s_feat_name.append(os.path.join(spatialFeat,name_file[idx_copy]))
+                self.t_feat_name.append(os.path.join(temporalFeat,name_file[idx_copy]))
+                idx_copy+=prompt_num
+    
         self.vids_dir=vids_dir
         self.datatype = datatype
         self.transform = transform
@@ -271,6 +270,7 @@ class Dataset_3mos(data.Dataset):
             select_idx=select_idx[:8]
             for i in select_idx:
                 cur_frame = vid[i].asnumpy()
+                cur_frame=cv2.resize(cur_frame,(512,512))
                 final_imgs.append(torch.from_numpy(cur_frame))
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 final_spa.append(cur_spa)               
@@ -299,6 +299,7 @@ class Dataset_3mos(data.Dataset):
                 select_idx = list(range(start_index, start_index + self.frame_num))
                 for j in select_idx:
                     cur_frame = vid[i].asnumpy()
+                    # cur_frame=cv2.resize(cur_frame,(512,512))
                     trans_img.append(torch.from_numpy(cur_frame))
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
@@ -315,6 +316,7 @@ class Dataset_3mos(data.Dataset):
                 lap_feat = []
                 for i in range(frame_len-8, frame_len):
                     cur_frame = vid[i].asnumpy()
+                    # cur_frame=cv2.resize(cur_frame,(512,512))
                     trans_img.append(torch.from_numpy(cur_frame))
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
@@ -373,15 +375,10 @@ def get_dataset(opt,seed):
         tmp_dataset=VQAdataset(key,opt["dataset"], transformations_vandt,'test',seed)
         test_loader[key] = torch.utils.data.DataLoader(tmp_dataset)
     
-    # valset=VQAdataset(opt["dataset"], transformations_vandt, 'val',seed)
-    # testset=VQAdataset(opt["dataset"], transformations_vandt, 'test', seed)
 
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=opt["train_batch_size"],
                                                    shuffle=True, num_workers=opt["num_workers"], drop_last=True)
-    # val_loader = torch.utils.data.DataLoader(valset, batch_size=1,
-    #                                              shuffle=False, num_workers=opt["num_workers"])
-    # test_loader = torch.utils.data.DataLoader(testset, batch_size=1,
-    #                                              shuffle=False, num_workers=opt["num_workers"])
+
     return train_loader, val_loader, test_loader
      
 class VQAdataset(data.Dataset):

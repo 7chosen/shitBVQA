@@ -11,20 +11,20 @@ save_model: True
 
 # data config
 dataset:
-  # LGVQ:
-  #   mos_num: 3
-  #   mos_file: ./data/LGVQ.csv
-  #   prompt_num: 468
-  #   vids_dir: /home/user/Documents/vqadata/LGVQ
-  #   tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_tem
-  #   spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_spa
-  # FETV:
-  #   mos_num: 3
-  #   mos_file: ./data/FETV.csv
-  #   prompt_num: 619
-  #   vids_dir: /home/user/Documents/vqadata/FETV
-  #   tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_tem
-  #   spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_spa
+  LGVQ:
+    mos_num: 3
+    mos_file: ./data/LGVQ.csv
+    prompt_num: 468
+    vids_dir: /home/user/Documents/vqadata/LGVQ
+    tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_tem
+    spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_spa
+  FETV:
+    mos_num: 3
+    mos_file: ./data/FETV.csv
+    prompt_num: 619
+    vids_dir: /home/user/Documents/vqadata/FETV
+    tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_tem
+    spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_spa
   T2VQA:
     mos_num: 1
     mos_file: ./data/T2VQA.csv

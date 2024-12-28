@@ -42,25 +42,27 @@ class VideoDataset_temporal_slowfast(data.Dataset):
         #     self.video_names = dataInfo['file_names']
         #     self.score = dataInfo['MOS']
 
-        if database_name == 'FETV':
-            video_names = []
-            for i in range(619):
-                if data_dir.find('cogvid') != -1:
-                    video_names.append(f'{i}.gif')
-                else:
-                    video_names.append(f'{i}'+'.mp4')
-            dataInfo = pd.DataFrame(video_names)
-            dataInfo.columns = ['file_names']
-            self.video_names = dataInfo['file_names']
+        # if database_name == 'FETV':
+        #     # video_names = []
+        #     # for i in range(619):
+        #     #     if data_dir.find('cogvid') != -1:
+        #     #         video_names.append(f'{i}.gif')
+        #     #     else:
+        #     #         video_names.append(f'{i}'+'.mp4')
+        #     # dataInfo = pd.DataFrame(video_names)
+        #     # dataInfo.columns = ['file_names']
+        #     # self.video_names = dataInfo['file_names']
+        #     self.video_names=glob.glob(f'{data_dir}/*.mp4')
         
-        if database_name == 'LGVQ':
-            video_names=glob.glob(f'{data_dir}/*.mp4')            
-            dataInfo = pd.DataFrame(video_names)
-            dataInfo.columns=['file_names']
-            self.video_names = dataInfo['file_names']
+        # if database_name == 'LGVQ':
+        #     # video_names=glob.glob(f'{data_dir}/*.mp4')            
+        #     # dataInfo = pd.DataFrame(video_names)
+        #     # dataInfo.columns=['file_names']
+        #     # self.video_names = dataInfo['file_names']
+        #     self.video_names=glob.glob(f'{data_dir}/*.mp4')
         
-        if database_name == 'T2VQA':
-            self.video_names=glob.glob(f'{data_dir}/*.mp4')
+        # if database_name == 'T2VQA':
+        self.video_names=glob.glob(f'{data_dir}/*.mp4')
             
 
         self.videos_dir = data_dir
@@ -77,17 +79,9 @@ class VideoDataset_temporal_slowfast(data.Dataset):
         vid_nm=filename.split('/')[-1][:-4]
         # print(filename)
 
-        if filename[-1] == '4':
-            cap = cv2.VideoCapture(filename)
-            video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            video_frame_rate = int(round(cap.get(cv2.CAP_PROP_FPS)))
-        elif filename[-1] == 'f':
-            cap = Image.open(filename)
-            video_length = cap.n_frames
-            frame_duration = cap.info['duration']
-            video_frame_rate = int(round(1000/frame_duration))
-        else:
-            raise Exception('not the correct filetype')
+        cap = cv2.VideoCapture(filename)
+        video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        video_frame_rate = int(round(cap.get(cv2.CAP_PROP_FPS)))
 
         video_length_round = video_length if video_length%8==0 else (video_length//8 +1 )*8
         if video_frame_rate == 0:
@@ -96,35 +90,22 @@ class VideoDataset_temporal_slowfast(data.Dataset):
         transformed_frame_all = torch.zeros(
             [video_length_round, video_channel, self.resize, self.resize])
 
-        if filename[-1] == '4':
-            for i in range(video_length):
-                has_frames, frame = cap.read()
-                if not has_frames:
-                    raise Exception('no frame detect')
-                read_frame = Image.fromarray(
-                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                read_frame = self.transform(read_frame)
-                transformed_frame_all[i] = read_frame
-            cap.release()
-        elif filename[-1] == 'f':
-            current_idx = 0
-            while current_idx < video_length:
-                try:
-                    cap.seek(current_idx)
-                    frame_rgb = cap.convert("RGB")
-                    # frame_np=np.array(frame_rgb)
-                    frame_np = self.transform(frame_rgb)
-                    transformed_frame_all[current_idx] = frame_np
-                    current_idx += 1
-                except EOFError:
-                    break
-        else:
-            raise Exception('vid path NOT right')
+        for i in range(video_length):
+            has_frames, frame = cap.read()
+            if not has_frames:
+                raise Exception('no frame detect')
+            read_frame = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            read_frame = self.transform(read_frame)
+            # print(read_frame.shape)
+            transformed_frame_all[i] = read_frame
+        cap.release()
+
         # 0-39 40
         # 0-32 33 || 33: == 32
         if video_length_round != video_length:
             transformed_frame_all[video_length:,:]=transformed_frame_all[video_length-1,:]
         
+        print('len: ', transformed_frame_all.shape[0], ' fr: ', video_frame_rate, ' name: ', vid_nm)
         # # 1-8 9-16
         # if video_length % 8 != 0 :
         #     tmp=transformed_frame_all.clone()
@@ -133,7 +114,6 @@ class VideoDataset_temporal_slowfast(data.Dataset):
         #     # last_8_ele=transformed_frame_all[video_length-9:video_length-1]
         #     transformed_frame_all[-8:]=tmp[video_length-9:video_length-1]
         #     # transformed_frame_all=torch.cat((transformed_frame_all,last_8_ele))
-        print('len: ', transformed_frame_all.shape[0], ' fr: ', video_frame_rate, ' name: ', vid_nm)
             
         # transformed_video_all = []
 
