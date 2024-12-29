@@ -187,12 +187,14 @@ class Dataset_3mos(data.Dataset):
         val_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8)]
         test_index=index_rd[int(prompt_num*0.8):]
         if database == 'FETV':
+            loop=4
             name_file=data_file.iloc[:,0]
             prompt_file=data_file.iloc[:,3]
             spa_file=data_file.iloc[:,4]
             tem_file=data_file.iloc[:,5]
             ali_file=data_file.iloc[:,6]
         elif database == 'LGVQ':
+            loop=6
             name_file=data_file.iloc[:,0]
             prompt_file = data_file.iloc[:,2]
             spa_file=data_file.iloc[:,3]
@@ -212,16 +214,15 @@ class Dataset_3mos(data.Dataset):
             final_idx=test_index
             
         for idx in final_idx:
-            idx_copy=idx
-            while 1:
-                if idx_copy >= len(os.listdir(vids_dir)):
-                    break
+            idx_copy=idx*loop
+            for j in range(loop):
                 self.score.append([tem_file[idx_copy],spa_file[idx_copy],ali_file[idx_copy]])
                 self.prompt_name.append(prompt_file[idx_copy])
                 self.vid_path_dir.append(os.path.join(vids_dir,name_file[idx_copy]))
                 self.s_feat_name.append(os.path.join(spatialFeat,name_file[idx_copy]))
                 self.t_feat_name.append(os.path.join(temporalFeat,name_file[idx_copy]))
-                idx_copy+=prompt_num
+                idx_copy+=1
+        
     
         self.vids_dir=vids_dir
         self.datatype = datatype
@@ -270,7 +271,7 @@ class Dataset_3mos(data.Dataset):
             select_idx=select_idx[:8]
             for i in select_idx:
                 cur_frame = vid[i].asnumpy()
-                cur_frame=cv2.resize(cur_frame,(512,512))
+                cur_frame=cv2.resize(cur_frame,(448,448))
                 final_imgs.append(torch.from_numpy(cur_frame))
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 final_spa.append(cur_spa)               
@@ -299,7 +300,6 @@ class Dataset_3mos(data.Dataset):
                 select_idx = list(range(start_index, start_index + self.frame_num))
                 for j in select_idx:
                     cur_frame = vid[i].asnumpy()
-                    # cur_frame=cv2.resize(cur_frame,(512,512))
                     trans_img.append(torch.from_numpy(cur_frame))
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
@@ -316,7 +316,6 @@ class Dataset_3mos(data.Dataset):
                 lap_feat = []
                 for i in range(frame_len-8, frame_len):
                     cur_frame = vid[i].asnumpy()
-                    # cur_frame=cv2.resize(cur_frame,(512,512))
                     trans_img.append(torch.from_numpy(cur_frame))
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
                     lap_feat.append(cur_spa)

@@ -40,10 +40,6 @@ def main(config):
                 feat_len=opt["feat_len"])
         print('The current model is ' + opt["model"])
 
-        # if config.multi_gpu:
-        #     model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
-        #     model = model.to(device)
-        # else:
         model = model.to(device)
         
         # if opt["pretrained_weights"] != None :
