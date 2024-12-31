@@ -44,7 +44,8 @@ def main(config):
         # load the trained model
         if opt["pretrained_weights"] != None :
             print('loading the pretrained model from ', opt["pretrained_weights"])
-            model.load_state_dict(torch.load(opt["pretrained_weights"]))
+            # model.load_state_dict(torch.load(opt["pretrained_weights"]))
+            model.load_state_dict(torch.load(f"./ckpts/{opt["model"]}_{loop}"))
 
 
         model = model.to(device)
@@ -103,6 +104,13 @@ def main(config):
                         dataname, aSRCC_st, aKRCC_st, aPLCC_st, aRMSE_st))
                     print('===')
                     SRCC_st = (tSRCC_st + sSRCC_st + aSRCC_st)/3
+                    KRCC_st = (tKRCC_st + sKRCC_st + aKRCC_st)/3
+                    PLCC_st = (tPLCC_st + sPLCC_st + aPLCC_st)/3
+                    RMSE_st = (tRMSE_st + sRMSE_st + aRMSE_st)/3
+                    print('{} final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+                        dataname, SRCC_st, KRCC_st, PLCC_st, RMSE_st))
+                    print('===')
+                    
 
             # tPLCC_b, tSRCC_b, tKRCC_b, tRMSE_b = performance_fit(
             #     label[:,0], Tem_y[:,0])

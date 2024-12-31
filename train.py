@@ -81,13 +81,14 @@ def main(config):
         train_loader, val_loader, _ = get_dataset(opt,loop)            
 
         best_val_criterion = -1  # SROCC min
-        SRCC_st = -1
+        # SRCC_st = -1
         best_val_b, best_val_s, best_val_t, best_val_st = [], [], [], []
 
         print('Starting training:')
 
         scaler = GradScaler()
         for epoch in range(opt["epochs"]):
+            SRCC_st_all = 0
             print(f'=== Current epoch: {epoch} ===')
             model.train()
             for i, return_list in enumerate(tqdm(train_loader,desc='Training...')):
@@ -104,7 +105,7 @@ def main(config):
                     with torch.autocast(device_type='cuda', dtype=torch.float16):
                         t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt, len(mos))
                         if len(mos) == 1:
-                            loss = criterion(label[0],(t[3]+s[3])/2)
+                            loss = criterion(label[0],(t[3]+s[3]+a[3])/2)
                         elif len(mos) == 3:
                             loss = criterion(label[0],t[3]) \
                                 +criterion(label[1],s[3]) \
@@ -174,23 +175,17 @@ def main(config):
                         print('===')
                         SRCC_st = (tSRCC_st + sSRCC_st + aSRCC_st)/3
                     
-
+                    SRCC_st_all += SRCC_st
             print(f'Epoch {epoch} completed.')
                 
         # ===================
         # save model
-            if SRCC_st > best_val_criterion:
-                best_val_criterion = SRCC_st
-                # best_val_st = [SRCC_st,KRCC_st,
-                #                 PLCC_st,RMSE_st]
-                #                 # aSRCC_st,aKRCC_st,
-                #                 # aPLCC_st,aRMSE_st]
+            if SRCC_st_all > best_val_criterion:
+                best_val_criterion = SRCC_st_all
                 if opt["save_model"] == True:
-                    print("current SRCC: ", SRCC_st)
+                    print("current SRCC: ", SRCC_st_all/3)
                     print(f'Save model using {epoch}th/{opt["epochs"]} training result')
                     torch.save(model.state_dict(), f'ckpts/{opt["model"]}_{loop}.pth')
-            # print('the best SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, and RMSE: {:.4f}'.format(
-            #     best_val_st[0], best_val_st[1], best_val_st[2], best_val_st[3]))
 
         print('Training completed.')    
         del model

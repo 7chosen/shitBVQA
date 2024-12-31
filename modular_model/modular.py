@@ -15,7 +15,7 @@ from q_align.model.builder import load_pretrained_model
 from q_align.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 
 qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
-
+condition = ['spatial', 'temporal','alignment']
 class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
     def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
         super(ViTbCLIP_SpatialTemporal_dropout, self).__init__()
@@ -63,7 +63,7 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         )
         return regression_block
     
-    def forward(self, x, tem_feat, spa_feat, prmt):
+    def forward(self, x, tem_feat, spa_feat, prmt, num):
         x_size = x.shape
         # x: (batch * frames) x 3-channel x height x width
         # eg. 128*3*224*224
@@ -84,9 +84,13 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
 
         input_texts = []
         for i in range(x_size[0]):
-            prompt = [prmt[i]]
-            texts = [f"a photo with {s} spatial quality and {t} temporal quality, which matches {p}"
-                     for s, t, p in product(qualitys, qualitys, prompt)]
+            prompt = prmt[i]
+            if num==3:
+                texts=[f"a photo with {s} {t} quality and quality, which matches {p}"
+                       for s,t,p in product(qualitys,condition,prompt)]
+            else:
+                texts = [f"a photo with {s} quality, which matches {p}"
+                         for s,p in product(qualitys,prompt)]
             input_texts.append(torch.cat([clip.tokenize(texts)]))
 
         input_texts = torch.cat(input_texts, dim=0)

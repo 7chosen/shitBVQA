@@ -97,7 +97,15 @@ class Dataset_1mos(data.Dataset):
             select_idx=select_idx[:8]            
             for i in select_idx:
                 cur_frame = vid[i].asnumpy()
-                final_imgs.append(torch.from_numpy(cur_frame))
+                
+                # ======
+                cur_frame = cv2.cvtColor(cur_frame,cv2.COLOR_BGR2RGB)
+                cur_frame = Image.fromarray(cur_frame)
+                cur_frame=self.transform(cur_frame)
+                final_imgs.append(cur_frame)
+                # ======
+
+                # final_imgs.append(torch.from_numpy(cur_frame))
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 final_spa.append(cur_spa)               
         
@@ -125,7 +133,13 @@ class Dataset_1mos(data.Dataset):
                 select_idx = list(range(start_index, start_index + self.frame_num))
                 for j in select_idx:
                     cur_frame = vid[i].asnumpy()
-                    trans_img.append(torch.from_numpy(cur_frame))
+                    # ======
+                    cur_frame = cv2.cvtColor(cur_frame,cv2.COLOR_BGR2RGB)
+                    cur_frame = Image.fromarray(cur_frame)
+                    cur_frame=self.transform(cur_frame)
+                    trans_img.append(cur_frame)
+                    # ======
+                    # trans_img.append(torch.from_numpy(cur_frame))
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
                 fast_feature = feature_tem[:, :, select_idx, :, :].squeeze().permute(1,0)
@@ -141,7 +155,13 @@ class Dataset_1mos(data.Dataset):
                 lap_feat = []
                 for i in range(frame_len-8, frame_len):
                     cur_frame = vid[i].asnumpy()
-                    trans_img.append(torch.from_numpy(cur_frame))
+                    # ======
+                    cur_frame = cv2.cvtColor(cur_frame,cv2.COLOR_BGR2RGB)
+                    cur_frame = Image.fromarray(cur_frame)
+                    cur_frame=self.transform(cur_frame)
+                    trans_img.append(cur_frame)
+                    # ======
+                    # trans_img.append(torch.from_numpy(cur_frame))
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
                 fast_feature = feature_tem[:, :, frame_len-9:frame_len-1, :, :].squeeze().permute(1,0)
@@ -163,7 +183,13 @@ class Dataset_1mos(data.Dataset):
             select_idx=select_idx[:8]            
             for idx,i in enumerate(select_idx):
                 cur_frame = vid[i].asnumpy()
-                img_g.append(torch.from_numpy(cur_frame))
+                # ======
+                cur_frame = cv2.cvtColor(cur_frame,cv2.COLOR_BGR2RGB)
+                cur_frame = Image.fromarray(cur_frame)
+                cur_frame=self.transform(cur_frame)
+                img_g.append(cur_frame)
+                # ======
+                # img_g.append(torch.from_numpy(cur_frame))
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 s_g.append(cur_spa)    
             img_g=torch.stack(img_g)
@@ -271,8 +297,14 @@ class Dataset_3mos(data.Dataset):
             select_idx=select_idx[:8]
             for i in select_idx:
                 cur_frame = vid[i].asnumpy()
-                cur_frame=cv2.resize(cur_frame,(448,448))
-                final_imgs.append(torch.from_numpy(cur_frame))
+                # cur_frame=cv2.resize(cur_frame,(448,448))
+                # ======
+                cur_frame = cv2.cvtColor(cur_frame,cv2.COLOR_BGR2RGB)
+                cur_frame = Image.fromarray(cur_frame)
+                cur_frame=self.transform(cur_frame)
+                final_imgs.append(cur_frame)
+                # ======
+                # final_imgs.append(torch.from_numpy(cur_frame))
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 final_spa.append(cur_spa)               
         
@@ -300,7 +332,13 @@ class Dataset_3mos(data.Dataset):
                 select_idx = list(range(start_index, start_index + self.frame_num))
                 for j in select_idx:
                     cur_frame = vid[i].asnumpy()
-                    trans_img.append(torch.from_numpy(cur_frame))
+                    # ======
+                    cur_frame = cv2.cvtColor(cur_frame,cv2.COLOR_BGR2RGB)
+                    cur_frame = Image.fromarray(cur_frame)
+                    cur_frame=self.transform(cur_frame)
+                    trans_img.append(cur_frame)
+                    # ======
+                    # trans_img.append(torch.from_numpy(cur_frame))
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{j}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
                 fast_feature = feature_tem[:, :, select_idx, :, :].squeeze().permute(1,0)
@@ -316,7 +354,13 @@ class Dataset_3mos(data.Dataset):
                 lap_feat = []
                 for i in range(frame_len-8, frame_len):
                     cur_frame = vid[i].asnumpy()
-                    trans_img.append(torch.from_numpy(cur_frame))
+                    # ======
+                    cur_frame = cv2.cvtColor(cur_frame,cv2.COLOR_BGR2RGB)
+                    cur_frame = Image.fromarray(cur_frame)
+                    cur_frame=self.transform(cur_frame)
+                    trans_img.append(cur_frame)
+                    # ======
+                    # trans_img.append(torch.from_numpy(cur_frame))
                     cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name, f'{i}.npy'))).view(-1)
                     lap_feat.append(cur_spa)
                 fast_feature = feature_tem[:, :, frame_len-9:frame_len-1, :, :].squeeze().permute(1,0)
@@ -338,7 +382,13 @@ class Dataset_3mos(data.Dataset):
             select_idx=select_idx[:8]
             for idx,i in enumerate(select_idx):
                 cur_frame = vid[i].asnumpy()
-                img_g.append(torch.from_numpy(cur_frame))
+                # ======
+                cur_frame = cv2.cvtColor(cur_frame,cv2.COLOR_BGR2RGB)
+                cur_frame = Image.fromarray(cur_frame)
+                cur_frame=self.transform(cur_frame)
+                img_g.append(cur_frame)
+                # ======
+                # img_g.append(torch.from_numpy(cur_frame))
                 cur_spa = torch.from_numpy(np.load(os.path.join(spatial_feat_name,f'{i}.npy'))).view(-1)
                 s_g.append(cur_spa)    
             img_g=torch.stack(img_g)
