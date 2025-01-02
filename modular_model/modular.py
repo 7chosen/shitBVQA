@@ -15,8 +15,7 @@ from q_align.model.builder import load_pretrained_model
 from q_align.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 from transformers import CLIPProcessor, CLIPModel
 qualitys = ['bad', 'fair', 'good']
-# qualitys = ['bad']
-# condition = ['spatial', 'temporal','alignment']
+# qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
 class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
     def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
         super(ViTbCLIP_SpatialTemporal_dropout, self).__init__()
@@ -100,36 +99,39 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         text_features = text_features.view(x_size[0],-1, text_features.size(1))
         # print(text_features[0][0][0])
         x_all = []
-        # x_all_presoftmax = []
+        x_all_presoftmax = []
         for i in range(x_size[0]):
             visual_feat = image_features[i, ...]
             text_feat = text_features[i, ...]
             cos_sim = logit_scale * visual_feat @ text_feat.t()
-            # cos_sim_pre = cos_sim
+            cos_sim_pre = cos_sim
             cos_sim = torch.nn.functional.softmax(cos_sim, dim=1)
             
             x_all.append(cos_sim.unsqueeze(0))
-            # x_all_presoftmax.append(cos_sim_pre.unsqueeze(0))
+            x_all_presoftmax.append(cos_sim_pre.unsqueeze(0))
 
         x_all = torch.cat(x_all, 0)
-        # x_all_presoftmax = torch.cat(x_all_presoftmax, 0)
+        x_all_presoftmax = torch.cat(x_all_presoftmax, 0)
         # bs * 8 * 125
         # 128*125
 
         # x_all = x_all.view(-1, x_all.size(2))
-        # x_all_presoftmax = x_all_presoftmax.view(-1, x_all_presoftmax.size(2))
+        x_all_presoftmax = x_all_presoftmax.view(-1, x_all_presoftmax.size(2))
 
         logits_all = x_all.view(-1, len(qualitys), len(qualitys),len(qualitys))
 
         xs = logits_all.sum(dim=(2,3))
         xt = logits_all.sum(dim=(1,3))
-        xa = logits_all.sum(dim=(1,2))
-        # xa = x_all_presoftmax.mean(1)
+        # xa = logits_all.sum(dim=(1,2))
+        xa = x_all_presoftmax.mean(1)
 
         xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] 
         xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] 
-        xa = 1 * xa[:, 0] + 2 * xa[:, 1] + 3 * xa[:, 2] 
+        # xa = 1 * xa[:, 0] + 2 * xa[:, 1] + 3 * xa[:, 2] 
 
+        # xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
+        # xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]
+        
         xs = xs.view(x_size[0],-1)
         xt = xt.view(x_size[0],-1)
         xa = xa.view(x_size[0], -1)
