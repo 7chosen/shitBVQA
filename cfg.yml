@@ -1,12 +1,12 @@
 # database: T2VQA
-model: exp
+model: aveScore
 model_path: /home/user/Documents/vqadata/t2vqa_qalign
 model_base: 
 
 # model: aveScore
 feat_len: 8
 split: 10
-epochs: 5
+epochs: 10
 save_model: True
 
 # data config
@@ -36,15 +36,17 @@ dataset:
 # model config
 lr: !!float 5e-6
 decay_ratio: !!float 0.9
-decay_interval: 2
+decay_interval: 4
 print_samples: 2000
 train_batch_size: 16
 num_workers: 8
 loss_type: plcc
 
 
-resize: 512
-crop_size: 448
+# resize: 512
+# crop_size: 448
+resize: 256
+crop_size: 224
 
 pretrained_weights: ckpts/0.pth
 

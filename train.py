@@ -41,7 +41,7 @@ def main(config):
         print('The current model is ' + opt["model"])
 
         model = model.to(device)
-        
+        model = model.to(torch.float32)
         # if opt["pretrained_weights"] != None :
         #     print('loading the pretrained model from ', opt["pretrained_weights"])
         #     model.load_state_dict(torch.load(opt["pretrained_weights"], weights_only=1))
@@ -62,7 +62,7 @@ def main(config):
         elif opt["loss_type"] == 'Huberloss':
             criterion = nn.HuberLoss().to(device)
 
-        # model.clip.logit_scale.requires_grad = False
+        model.clip.logit_scale.requires_grad = False
         param_num = 0
         for param in model.parameters():
             param_num += int(np.prod(param.shape))
@@ -93,9 +93,10 @@ def main(config):
             model.train()
             for i, return_list in enumerate(tqdm(train_loader,desc='Training...')):
                 for _ in return_list:
+
+                    optimizer.zero_grad()
                     vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
                         spa_feat, spa_feat_g, mos, count, prmt = _
-                    # print(mos)
                     label=[]
                     for _ in range(len(mos)):
                         label.append(mos[_].to(device).float())
@@ -104,6 +105,7 @@ def main(config):
                     spa_feat = spa_feat.to(device)
                     with torch.autocast(device_type='cuda', dtype=torch.float16):
                         t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt, len(mos))
+                        # print(t[3],s[3],a[3])
                         if len(mos) == 1:
                             loss = criterion(label[0],(t[3]+s[3]+a[3])/2)
                         elif len(mos) == 3:
@@ -113,11 +115,15 @@ def main(config):
                         else:
                             raise Exception('The number of mos is not correct')
                         loss /= len(mos)
-
-                    optimizer.zero_grad()
+                    if torch.isnan(loss):
+                        raise Exception('Loss is NaN')
+                        # continue
+                        
                     scaler.scale(loss).backward()
                     scaler.step(optimizer)
                     scaler.update()
+                    # loss.backward()
+                    # optimizer.step()
             scheduler.step()
                 
             # ======================================
@@ -126,7 +132,7 @@ def main(config):
                 model.eval()
                 for dataname in opt["dataset"]:
                     valset=val_loader[dataname]
-                    Tem_y, Spa_y, Ali_y = [np.zeros([len(valset), 4]) for _ in range(3)]
+                    Tem_y, Spa_y, Ali_y = [torch.zeros([len(valset), 4]) for _ in range(3)]
                     label = np.zeros([len(valset),3])
                     for i, _ in enumerate(tqdm(valset,desc=f"{dataname} validating...")):
                         
@@ -152,7 +158,7 @@ def main(config):
                         t, s, a = model(x, y, z, prmt,len(mos))
                         Tem_y[i], Spa_y[i], Ali_y[i] = (mid_t + t)/2, (mid_s + s)/2, (mid_a + a)/2
 
-
+                    Tem_y, Spa_y, Ali_y = Tem_y.cpu().numpy(), Spa_y.cpu().numpy(), Ali_y.cpu().numpy()
                     if dataname == 'T2VQA':
                         PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
                             label[:,0], (Tem_y[:,3]+Spa_y[:,3])/2)    
@@ -184,7 +190,7 @@ def main(config):
                 best_val_criterion = SRCC_st_all
                 if opt["save_model"] == True:
                     print("current SRCC: ", SRCC_st_all/3)
-                    print(f'Save model using {epoch}th/{opt["epochs"]} training result')
+                    print(f'Save model using {epoch+1}th/{opt["epochs"]} training result')
                     torch.save(model.state_dict(), f'ckpts/{opt["model"]}_{loop}.pth')
 
         print('Training completed.')    

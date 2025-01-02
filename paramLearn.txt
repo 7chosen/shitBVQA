@@ -1,0 +1,650 @@
+Parameter Name: clip.positional_embedding
+
+Parameter Name: clip.text_projection
+
+Parameter Name: clip.visual.class_embedding
+
+Parameter Name: clip.visual.positional_embedding
+
+Parameter Name: clip.visual.proj
+
+Parameter Name: clip.visual.conv1.weight
+
+Parameter Name: clip.visual.ln_pre.weight
+
+Parameter Name: clip.visual.ln_pre.bias
+
+Parameter Name: clip.visual.transformer.resblocks.0.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.0.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.0.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.0.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.0.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.0.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.0.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.0.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.0.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.0.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.0.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.0.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.1.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.1.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.1.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.1.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.1.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.1.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.1.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.1.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.1.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.1.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.1.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.1.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.2.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.2.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.2.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.2.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.2.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.2.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.2.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.2.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.2.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.2.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.2.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.2.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.3.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.3.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.3.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.3.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.3.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.3.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.3.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.3.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.3.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.3.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.3.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.3.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.4.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.4.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.4.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.4.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.4.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.4.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.4.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.4.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.4.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.4.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.4.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.4.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.5.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.5.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.5.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.5.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.5.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.5.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.5.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.5.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.5.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.5.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.5.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.5.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.6.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.6.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.6.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.6.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.6.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.6.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.6.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.6.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.6.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.6.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.6.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.6.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.7.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.7.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.7.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.7.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.7.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.7.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.7.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.7.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.7.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.7.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.7.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.7.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.8.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.8.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.8.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.8.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.8.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.8.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.8.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.8.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.8.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.8.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.8.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.8.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.9.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.9.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.9.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.9.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.9.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.9.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.9.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.9.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.9.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.9.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.9.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.9.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.10.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.10.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.10.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.10.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.10.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.10.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.10.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.10.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.10.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.10.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.10.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.10.ln_2.bias
+
+Parameter Name: clip.visual.transformer.resblocks.11.attn.in_proj_weight
+
+Parameter Name: clip.visual.transformer.resblocks.11.attn.in_proj_bias
+
+Parameter Name: clip.visual.transformer.resblocks.11.attn.out_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.11.attn.out_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.11.ln_1.weight
+
+Parameter Name: clip.visual.transformer.resblocks.11.ln_1.bias
+
+Parameter Name: clip.visual.transformer.resblocks.11.mlp.c_fc.weight
+
+Parameter Name: clip.visual.transformer.resblocks.11.mlp.c_fc.bias
+
+Parameter Name: clip.visual.transformer.resblocks.11.mlp.c_proj.weight
+
+Parameter Name: clip.visual.transformer.resblocks.11.mlp.c_proj.bias
+
+Parameter Name: clip.visual.transformer.resblocks.11.ln_2.weight
+
+Parameter Name: clip.visual.transformer.resblocks.11.ln_2.bias
+
+Parameter Name: clip.visual.ln_post.weight
+
+Parameter Name: clip.visual.ln_post.bias
+
+Parameter Name: clip.transformer.resblocks.0.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.0.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.0.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.0.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.0.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.0.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.0.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.0.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.0.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.0.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.0.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.0.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.1.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.1.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.1.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.1.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.1.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.1.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.1.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.1.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.1.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.1.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.1.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.1.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.2.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.2.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.2.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.2.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.2.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.2.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.2.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.2.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.2.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.2.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.2.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.2.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.3.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.3.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.3.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.3.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.3.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.3.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.3.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.3.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.3.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.3.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.3.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.3.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.4.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.4.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.4.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.4.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.4.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.4.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.4.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.4.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.4.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.4.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.4.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.4.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.5.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.5.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.5.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.5.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.5.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.5.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.5.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.5.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.5.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.5.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.5.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.5.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.6.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.6.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.6.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.6.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.6.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.6.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.6.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.6.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.6.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.6.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.6.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.6.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.7.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.7.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.7.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.7.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.7.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.7.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.7.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.7.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.7.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.7.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.7.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.7.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.8.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.8.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.8.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.8.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.8.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.8.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.8.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.8.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.8.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.8.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.8.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.8.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.9.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.9.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.9.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.9.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.9.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.9.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.9.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.9.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.9.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.9.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.9.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.9.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.10.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.10.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.10.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.10.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.10.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.10.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.10.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.10.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.10.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.10.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.10.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.10.ln_2.bias
+
+Parameter Name: clip.transformer.resblocks.11.attn.in_proj_weight
+
+Parameter Name: clip.transformer.resblocks.11.attn.in_proj_bias
+
+Parameter Name: clip.transformer.resblocks.11.attn.out_proj.weight
+
+Parameter Name: clip.transformer.resblocks.11.attn.out_proj.bias
+
+Parameter Name: clip.transformer.resblocks.11.ln_1.weight
+
+Parameter Name: clip.transformer.resblocks.11.ln_1.bias
+
+Parameter Name: clip.transformer.resblocks.11.mlp.c_fc.weight
+
+Parameter Name: clip.transformer.resblocks.11.mlp.c_fc.bias
+
+Parameter Name: clip.transformer.resblocks.11.mlp.c_proj.weight
+
+Parameter Name: clip.transformer.resblocks.11.mlp.c_proj.bias
+
+Parameter Name: clip.transformer.resblocks.11.ln_2.weight
+
+Parameter Name: clip.transformer.resblocks.11.ln_2.bias
+
+Parameter Name: clip.token_embedding.weight
+
+Parameter Name: clip.ln_final.weight
+
+Parameter Name: clip.ln_final.bias
+
+Parameter Name: spatialRec1.0.weight
+
+Parameter Name: spatialRec1.0.bias
+
+Parameter Name: spatialRec1.2.weight
+
+Parameter Name: spatialRec1.2.bias
+
+Parameter Name: spatialRec2.0.weight
+
+Parameter Name: spatialRec2.0.bias
+
+Parameter Name: spatialRec2.2.weight
+
+Parameter Name: spatialRec2.2.bias
+
+Parameter Name: spatialRec3.0.weight
+
+Parameter Name: spatialRec3.0.bias
+
+Parameter Name: spatialRec3.2.weight
+
+Parameter Name: spatialRec3.2.bias
+
+Parameter Name: temporalRec1.0.weight
+
+Parameter Name: temporalRec1.0.bias
+
+Parameter Name: temporalRec1.2.weight
+
+Parameter Name: temporalRec1.2.bias
+
+Parameter Name: temporalRec2.0.weight
+
+Parameter Name: temporalRec2.0.bias
+
+Parameter Name: temporalRec2.2.weight
+
+Parameter Name: temporalRec2.2.bias
+
+Parameter Name: temporalRec3.0.weight
+
+Parameter Name: temporalRec3.0.bias
+
+Parameter Name: temporalRec3.2.weight
+
+Parameter Name: temporalRec3.2.bias
+

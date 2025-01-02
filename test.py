@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn
-from torchvision import transforms
+# from torchvision import transforms
 from tqdm import tqdm
 import yaml
 from modular_model import modular
@@ -18,11 +18,15 @@ def main(config):
     print(device)
     with open(config.opt, "r") as f:
         opt = yaml.safe_load(f)
-    # stats = pd.read_csv('logs/ViTtest.csv')
 
+    t2vqa_s,t2vqa_p,t2vqa_r, t2vqa_k = [],[],[],[]
+    lgvq_s1,lgvq_p1,lgvq_r1, lgvq_k1 = [],[],[],[]
+    lgvq_s2,lgvq_p2,lgvq_r2, lgvq_k2 = [],[],[],[]
+    lgvq_s3,lgvq_p3,lgvq_r3, lgvq_k3 = [],[],[],[]
+    fetv_s1,fetv_p1,fetv_r1, fetv_k1 = [],[],[],[]
+    fetv_s2,fetv_p2,fetv_r2, fetv_k2 = [],[],[],[]
+    fetv_s3,fetv_p3,fetv_r3, fetv_k3 = [],[],[],[]
     for loop in range(opt["split"]):
-        if loop!=0:
-            break
         if opt["model"] == 'aveScore':
             model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=opt["feat_len"])
         elif opt["model"] == 'aveFeat':
@@ -45,18 +49,18 @@ def main(config):
         if opt["pretrained_weights"] != None :
             print('loading the pretrained model from ', opt["pretrained_weights"])
             # model.load_state_dict(torch.load(opt["pretrained_weights"]))
-            model.load_state_dict(torch.load(f"./ckpts/{opt["model"]}_{loop}"))
+            model.load_state_dict(torch.load(f"./ckpts/{opt["model"]}_{loop}.pth"))
 
 
-        model = model.to(device)
-        train_loader, val_loader,  test_loader = get_dataset(opt,loop)   
+        model = model.to(device).to(torch.float32)
+        _,_, test_loader = get_dataset(opt,loop)   
 
-
+        
         with torch.no_grad():
             model.eval()
             for dataname in opt["dataset"]:
                 testset=test_loader[dataname]
-                Tem_y, Spa_y, Ali_y = [np.zeros([len(testset), 4]) for _ in range(3)]
+                Tem_y, Spa_y, Ali_y = [torch.zeros([len(testset), 4]) for _ in range(3)]
                 label = np.zeros([len(testset),3])
                 for i, _ in enumerate(tqdm(testset,desc=f"{dataname} testing...")):
                     
@@ -72,23 +76,27 @@ def main(config):
                         x = vid_chunk[:,j,...].to(device)
                         y = tem_feat[:,j,...].to(device)
                         z = spa_feat[:,j,...].to(device)
-                        t, s, a = model(x, y, z, prmt)
+                        t, s, a = model(x, y, z, prmt,len(mos))
                         mid_t, mid_s, mid_a = mid_t+t, mid_s+s, mid_a+a
                     mid_t, mid_s, mid_a = mid_t/count, mid_s/count, mid_a/count
 
                     x = vid_chunk_g.to(device)
                     y = tem_feat_g.to(device)
                     z = spa_feat_g.to(device)
-                    t, s, a = model(x, y, z, prmt)
+                    t, s, a = model(x, y, z, prmt,len(mos))
                     Tem_y[i], Spa_y[i], Ali_y[i] = (mid_t + t)/2, (mid_s + s)/2, (mid_a + a)/2
 
-
+                Tem_y, Spa_y, Ali_y = Tem_y.cpu().numpy(), Spa_y.cpu().numpy(), Ali_y.cpu().numpy()
                 if dataname == 'T2VQA':
                     PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
                         label[:,0], (Tem_y[:,3]+Spa_y[:,3])/2)    
-                    print('{} final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
-                        dataname, SRCC_st, KRCC_st, PLCC_st, RMSE_st))
-                    print('===')
+                    # print('{} final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+                    #     dataname, SRCC_st, KRCC_st, PLCC_st, RMSE_st))
+                    # print('===')
+                    t2vqa_s.append(SRCC_st)
+                    t2vqa_p.append(PLCC_st)
+                    t2vqa_r.append(RMSE_st)
+                    t2vqa_k.append(KRCC_st)
                 else:
                     tPLCC_st, tSRCC_st, tKRCC_st, tRMSE_st = performance_fit(
                         label[:,0], Tem_y[:,3])
@@ -96,100 +104,57 @@ def main(config):
                         label[:,1], Spa_y[:,3])
                     aPLCC_st, aSRCC_st, aKRCC_st, aRMSE_st = performance_fit(
                         label[:,2], Ali_y[:,3])
-                    print('{} final tem ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
-                        dataname, tSRCC_st, tKRCC_st, tPLCC_st, tRMSE_st))
-                    print('{} final spa ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
-                        dataname, sSRCC_st, sKRCC_st, sPLCC_st, sRMSE_st))
-                    print('{} final ali ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
-                        dataname, aSRCC_st, aKRCC_st, aPLCC_st, aRMSE_st))
-                    print('===')
-                    SRCC_st = (tSRCC_st + sSRCC_st + aSRCC_st)/3
-                    KRCC_st = (tKRCC_st + sKRCC_st + aKRCC_st)/3
-                    PLCC_st = (tPLCC_st + sPLCC_st + aPLCC_st)/3
-                    RMSE_st = (tRMSE_st + sRMSE_st + aRMSE_st)/3
-                    print('{} final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
-                        dataname, SRCC_st, KRCC_st, PLCC_st, RMSE_st))
-                    print('===')
-                    
+                    # print('{} final tem ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+                    #     dataname, tSRCC_st, tKRCC_st, tPLCC_st, tRMSE_st))
+                    # print('{} final spa ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+                    #     dataname, sSRCC_st, sKRCC_st, sPLCC_st, sRMSE_st))
+                    # print('{} final ali ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+                    #     dataname, aSRCC_st, aKRCC_st, aPLCC_st, aRMSE_st))
+                    # print('===')
+                    if dataname == 'LGVQ':
+                        lgvq_s1.append(tSRCC_st)
+                        lgvq_p1.append(tPLCC_st)
+                        lgvq_r1.append(tRMSE_st)
+                        lgvq_k1.append(tKRCC_st)
+                        lgvq_s2.append(sSRCC_st)
+                        lgvq_p2.append(sPLCC_st)
+                        lgvq_r2.append(sRMSE_st)
+                        lgvq_k2.append(sKRCC_st)
+                        lgvq_s3.append(aSRCC_st)
+                        lgvq_p3.append(aPLCC_st)
+                        lgvq_r3.append(aRMSE_st)
+                        lgvq_k3.append(aKRCC_st)
+                    if dataname == 'FETV':
+                        fetv_s1.append(tSRCC_st)
+                        fetv_p1.append(tPLCC_st)
+                        fetv_r1.append(tRMSE_st)
+                        fetv_k1.append(tKRCC_st)
+                        fetv_s2.append(sSRCC_st)
+                        fetv_p2.append(sPLCC_st)
+                        fetv_r2.append(sRMSE_st)
+                        fetv_k2.append(sKRCC_st)
+                        fetv_s3.append(aSRCC_st)
+                        fetv_p3.append(aPLCC_st)
+                        fetv_r3.append(aRMSE_st)
+                        fetv_k3.append(aKRCC_st)
+    print('LGVQ final tem ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+        np.median(lgvq_s1), np.median(lgvq_k1), np.median(lgvq_p1), np.median(lgvq_r1)))
+    print('LGVQ final spa ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+        np.median(lgvq_s2), np.median(lgvq_k2), np.median(lgvq_p2), np.median(lgvq_r2)))
+    print('LGVQ final ali ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+        np.median(lgvq_s3), np.median(lgvq_k3), np.median(lgvq_p3), np.median(lgvq_r3)))
 
-            # tPLCC_b, tSRCC_b, tKRCC_b, tRMSE_b = performance_fit(
-            #     label[:,0], Tem_y[:,0])
-            # tPLCC_t, tSRCC_t, tKRCC_t, tRMSE_t = performance_fit(
-            #     label[:,0], Tem_y[:,1])
-            # tPLCC_s, tSRCC_s, tKRCC_s, tRMSE_s = performance_fit(
-            #     label[:,0], Tem_y[:,2])
-            # tPLCC_st, tSRCC_st, tKRCC_st, tRMSE_st = performance_no_fit(
-            #     label[:,0], Tem_y[:,3])
-            
-            # sPLCC_b, sSRCC_b, sKRCC_b, sRMSE_b = performance_fit(
-            #     label[:,1], Spa_y[:,0])
-            # sPLCC_t, sSRCC_t, sKRCC_t, sRMSE_t = performance_fit(
-            #     label[:,1], Spa_y[:,1])
-            # sPLCC_s, sSRCC_s, sKRCC_s, sRMSE_s = performance_fit(
-            #     label[:,1], Spa_y[:,2])
-            # sPLCC_st, sSRCC_st, sKRCC_st, sRMSE_st = performance_no_fit(
-            #     label[:,1], Spa_y[:,3])
-            
-            # aPLCC_b, aSRCC_b, aKRCC_b, aRMSE_b = performance_fit(
-            #     label[:,2], Ali_y[:,0])
-            # aPLCC_t, aSRCC_t, aKRCC_t, aRMSE_t = performance_fit(
-            #     label[:,2], Ali_y[:,1])
-            # aPLCC_s, aSRCC_s, aKRCC_s, aRMSE_s = performance_fit(
-            #     label[:,2], Ali_y[:,2])
-            # aPLCC_st, aSRCC_st, aKRCC_st, aRMSE_st = performance_no_fit(
-            #     label[:,2], Ali_y[:,3])    
+    print('FETV final tem ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format( 
+        np.median(fetv_s1), np.median(fetv_k1), np.median(fetv_p1), np.median(fetv_r1)))
+    print('FETV final spa ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+        np.median(fetv_s2), np.median(fetv_k2), np.median(fetv_p2), np.median(fetv_r2)))
+    print('FETV final ali ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+        np.median(fetv_s3), np.median(fetv_k3), np.median(fetv_p3), np.median(fetv_r3)))
 
-            # PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
-            #     label[:,0], (Tem_y[:,3]+Spa_y[:,3])/2) 
 
-            # new_row=[
-            #         tSRCC_st,tKRCC_st, tPLCC_st, tRMSE_st,
-            #         sSRCC_st,sKRCC_st, sPLCC_st, sRMSE_st,
-            #         aSRCC_st,aKRCC_st, aPLCC_st, aRMSE_st
-            #         ]
-            # stats.loc[len(stats)]=new_row
-
-            # print('===============Tem==============')
-            # print(
-            #     'base test: SRCC: {:.4f}'.format(tSRCC_b))
-            # print(
-            #     'T test: SRCC: {:.4f}'.format(tSRCC_t))
-            # print(
-            #     'S test: SRCC: {:.4f}'.format(tSRCC_s))
-            # print(
-            #     'tem ST test: SRCC: {:.4f}'.format(tSRCC_st))
-            # print('===============Spa==============')
-            # print(
-            #     'base test: SRCC: {:.4f}'.format(sSRCC_b))
-            # print(
-            #     'T test: SRCC: {:.4f}'.format(sSRCC_t))
-            # print(
-            #     'S test: SRCC: {:.4f}'.format(sSRCC_s))
-
-            # print(
-            #     'spa ST test: SRCC: {:.4f}'.format(sSRCC_st))
-
-            # print('===============Ali==============')
-            # print(
-            #     'base test: SRCC: {:.4f}'.format(aSRCC_b))
-            # print(
-            #     'T test: SRCC: {:.4f}'.format(aSRCC_t))
-            # print(
-            #     'S test: SRCC: {:.4f}'.format(aSRCC_s))
-            # print(
-            #     'ST test: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, RMSE: {:.4f}'
-            #     .format(aSRCC_st,aKRCC_st,aPLCC_st,aRMSE_st))
-            
-            # print('ST test: SRCC: {:.4f}, KRCC: {:.4f}, PLCC: {:.4f}, RMSE: {:.4f}'
-            #     .format(SRCC_st,KRCC_st,PLCC_st,RMSE_st))
-
-        # new_row=[0,0,0,0,
-        #             0,0,0,0,
-        #             0,0,0,0] 
-        # stats.loc[len(stats)]=new_row 
-        # stats.to_csv('logs/ViTtest.csv',index=False)        
-        
-
+    print('T2VQA final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+        np.median(t2vqa_s), np.median(t2vqa_k), np.median(t2vqa_p), np.median(t2vqa_r))
+    )
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

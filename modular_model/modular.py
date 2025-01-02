@@ -13,17 +13,15 @@ from q_align.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
 from q_align.conversation import conv_templates, SeparatorStyle
 from q_align.model.builder import load_pretrained_model
 from q_align.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
-
-qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
-condition = ['spatial', 'temporal','alignment']
+from transformers import CLIPProcessor, CLIPModel
+qualitys = ['bad', 'fair', 'good']
+# qualitys = ['bad']
+# condition = ['spatial', 'temporal','alignment']
 class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
     def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
         super(ViTbCLIP_SpatialTemporal_dropout, self).__init__()
+        # self.clip = CLIPModel.from_pretrained("openai/clip-vit-base-patch16")
         ViT_B_16, _ = clip.load("ViT-B/16")
-
-        # clip_vit_b_pretrained_features = ViT_B_16.visual
-        # self.feature_extraction = clip_vit_b_pretrained_features
-        
         self.clip=ViT_B_16
         self.feat_len = feat_len
         self.dropout_sp = dropout_sp
@@ -68,10 +66,11 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         # x: (batch * frames) x 3-channel x height x width
         # eg. 128*3*224*224
         x = x.view(-1, x_size[2], x_size[3], x_size[4])
-
-        # Using clip.text
+        
         # input shape (batch_size*frame_num)*c*h*w, which h and w must be 224
         image_features = self.clip.encode_image(x)
+        
+        # print(image_features[0][0])
         # (batch_size*frame_num) * 512
 
         # Normalize image features
@@ -84,51 +83,52 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
 
         input_texts = []
         for i in range(x_size[0]):
-            prompt = prmt[i]
-            if num==3:
-                texts=[f"a photo with {s} {t} quality and quality, which matches {p}"
-                       for s,t,p in product(qualitys,condition,prompt)]
-            else:
-                texts = [f"a photo with {s} quality, which matches {p}"
-                         for s,p in product(qualitys,prompt)]
-            input_texts.append(torch.cat([clip.tokenize(texts)]))
+            prompt = [prmt[i]]
+            texts=[f"a photo with {s} spatial quality, {t} temporal quality and {a} alignment quality,which matches {p}"
+                    for s,t,a,p in product(qualitys,qualitys,qualitys,prompt)]
+            input_texts.append(torch.cat([clip.tokenize(texts,context_length=77,truncate=True)]))
+
 
         input_texts = torch.cat(input_texts, dim=0)
+        # print(input_texts.shape)
 
         text_features =  self.clip.encode_text(input_texts.to(x.device))
+        # print(text_features[0][0])
         # 200 * 512
         text_features = text_features / text_features.norm(dim=1, keepdim=True)
-        # bs * 25 * 512
+        # bs * 15 * 512
         text_features = text_features.view(x_size[0],-1, text_features.size(1))
-
+        # print(text_features[0][0][0])
         x_all = []
-        x_all_presoftmax = []
+        # x_all_presoftmax = []
         for i in range(x_size[0]):
             visual_feat = image_features[i, ...]
             text_feat = text_features[i, ...]
             cos_sim = logit_scale * visual_feat @ text_feat.t()
-            cos_sim_pre = cos_sim
-            # print(cos_sim_pre.shape)
+            # cos_sim_pre = cos_sim
             cos_sim = torch.nn.functional.softmax(cos_sim, dim=1)
+            
             x_all.append(cos_sim.unsqueeze(0))
-            x_all_presoftmax.append(cos_sim_pre.unsqueeze(0))
+            # x_all_presoftmax.append(cos_sim_pre.unsqueeze(0))
 
         x_all = torch.cat(x_all, 0)
-        x_all_presoftmax = torch.cat(x_all_presoftmax, 0)
-        # 8*8*25
-        
-        x_all = x_all.view(-1, x_all.size(2))
-        x_all_presoftmax = x_all_presoftmax.view(-1, x_all_presoftmax.size(2))
+        # x_all_presoftmax = torch.cat(x_all_presoftmax, 0)
+        # bs * 8 * 125
+        # 128*125
 
-        logits_all = x_all.view(-1, len(qualitys), len(qualitys))
+        # x_all = x_all.view(-1, x_all.size(2))
+        # x_all_presoftmax = x_all_presoftmax.view(-1, x_all_presoftmax.size(2))
 
-        xs = logits_all.sum(2)
-        xt = logits_all.sum(1)
-        xa = x_all_presoftmax.mean(1)
+        logits_all = x_all.view(-1, len(qualitys), len(qualitys),len(qualitys))
 
-        xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
-        xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]
-        # print(xt.shape)
+        xs = logits_all.sum(dim=(2,3))
+        xt = logits_all.sum(dim=(1,3))
+        xa = logits_all.sum(dim=(1,2))
+        # xa = x_all_presoftmax.mean(1)
+
+        xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] 
+        xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] 
+        xa = 1 * xa[:, 0] + 2 * xa[:, 1] + 3 * xa[:, 2] 
 
         xs = xs.view(x_size[0],-1)
         xt = xt.view(x_size[0],-1)
