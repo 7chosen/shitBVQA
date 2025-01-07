@@ -19,8 +19,6 @@ def main(config):
     with open(config.opt, "r") as f:
         opt = yaml.safe_load(f)
 
-    # stats = pd.read_csv('logs/ViTval.csv')
-
     for loop in range(opt["split"]):        
         
         print('the %dth round training starts here' % (loop) )
@@ -40,8 +38,7 @@ def main(config):
                 feat_len=opt["feat_len"])
         print('The current model is ' + opt["model"])
 
-        model = model.to(device)
-        model = model.to(torch.float32)
+        model = model.to(device).to(torch.float32)
         # if opt["pretrained_weights"] != None :
         #     print('loading the pretrained model from ', opt["pretrained_weights"])
         #     model.load_state_dict(torch.load(opt["pretrained_weights"], weights_only=1))
@@ -75,25 +72,22 @@ def main(config):
         #             # f.write(f"Values: {param.data}\n")
         #             f.write("\n")
 
-
-
         # dataloader
         train_loader, val_loader, _ = get_dataset(opt,loop)            
 
         best_val_criterion = -1  # SROCC min
         # SRCC_st = -1
-        best_val_b, best_val_s, best_val_t, best_val_st = [], [], [], []
+        # best_val_b, best_val_s, best_val_t, best_val_st = [], [], [], []
 
         print('Starting training:')
 
         scaler = GradScaler()
         for epoch in range(opt["epochs"]):
             SRCC_st_all = 0
-            print(f'=== Current epoch: {epoch} ===')
+            print(f'=== Current epoch: {epoch+1} ===')
             model.train()
             for i, return_list in enumerate(tqdm(train_loader,desc='Training...')):
                 for _ in return_list:
-
                     optimizer.zero_grad()
                     vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
                         spa_feat, spa_feat_g, mos, count, prmt = _
@@ -105,9 +99,8 @@ def main(config):
                     spa_feat = spa_feat.to(device)
                     with torch.autocast(device_type='cuda', dtype=torch.float16):
                         t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt, len(mos))
-                        # print(t[3],s[3],a[3])
                         if len(mos) == 1:
-                            loss = criterion(label[0],(t[3]+s[3]+a[3])/2)
+                            loss = criterion(label[0],(t[3]+s[3])/2)
                         elif len(mos) == 3:
                             loss = criterion(label[0],t[3]) \
                                 +criterion(label[1],s[3]) \
@@ -122,8 +115,6 @@ def main(config):
                     scaler.scale(loss).backward()
                     scaler.step(optimizer)
                     scaler.update()
-                    # loss.backward()
-                    # optimizer.step()
             scheduler.step()
                 
             # ======================================
@@ -182,14 +173,14 @@ def main(config):
                         SRCC_st = (tSRCC_st + sSRCC_st + aSRCC_st)/3
                     
                     SRCC_st_all += SRCC_st
-            print(f'Epoch {epoch} completed.')
+            print(f'Epoch {epoch+1} completed.')
                 
         # ===================
         # save model
             if SRCC_st_all > best_val_criterion:
                 best_val_criterion = SRCC_st_all
                 if opt["save_model"] == True:
-                    print("current SRCC: ", SRCC_st_all/3)
+                    print("current SRCC: ", SRCC_st_all)
                     print(f'Save model using {epoch+1}th/{opt["epochs"]} training result')
                     torch.save(model.state_dict(), f'ckpts/{opt["model"]}_{loop}.pth')
 

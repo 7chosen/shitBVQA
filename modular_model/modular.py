@@ -14,8 +14,8 @@ from q_align.conversation import conv_templates, SeparatorStyle
 from q_align.model.builder import load_pretrained_model
 from q_align.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 from transformers import CLIPProcessor, CLIPModel
-qualitys = ['bad', 'fair', 'good']
-# qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
+# qualitys = ['bad', 'fair', 'good']
+qualitys = ['bad', 'poor', 'fair', 'good', 'perfect']
 class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
     def __init__(self, feat_len=8, sr=True, tr=True, dropout_sp=0.2, dropout_tp=0.2):
         super(ViTbCLIP_SpatialTemporal_dropout, self).__init__()
@@ -83,8 +83,8 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         input_texts = []
         for i in range(x_size[0]):
             prompt = [prmt[i]]
-            texts=[f"a photo with {s} spatial quality, {t} temporal quality and {a} alignment quality,which matches {p}"
-                    for s,t,a,p in product(qualitys,qualitys,qualitys,prompt)]
+            texts=[f"a photo with {s} spatial quality, {t} temporal quality, which matches {p}"
+                    for s,t,p in product(qualitys,qualitys,prompt)]
             input_texts.append(torch.cat([clip.tokenize(texts,context_length=77,truncate=True)]))
 
 
@@ -118,19 +118,16 @@ class ViTbCLIP_SpatialTemporal_dropout(torch.nn.Module):
         # x_all = x_all.view(-1, x_all.size(2))
         x_all_presoftmax = x_all_presoftmax.view(-1, x_all_presoftmax.size(2))
 
-        logits_all = x_all.view(-1, len(qualitys), len(qualitys),len(qualitys))
+        logits_all = x_all.view(-1, len(qualitys), len(qualitys))
 
-        xs = logits_all.sum(dim=(2,3))
-        xt = logits_all.sum(dim=(1,3))
-        # xa = logits_all.sum(dim=(1,2))
+        xs = logits_all.sum(dim=2)
+        xt = logits_all.sum(dim=1)
+        
         xa = x_all_presoftmax.mean(1)
 
-        xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] 
-        xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] 
-        # xa = 1 * xa[:, 0] + 2 * xa[:, 1] + 3 * xa[:, 2] 
-
-        # xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
-        # xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]
+        xs = 1 * xs[:, 0] + 2 * xs[:, 1] + 3 * xs[:, 2] + 4 * xs[:, 3] + 5 * xs[:, 4]
+        xt = 1 * xt[:, 0] + 2 * xt[:, 1] + 3 * xt[:, 2] + 4 * xt[:, 3] + 5 * xt[:, 4]
+        # xa=(xs+xt)/2
         
         xs = xs.view(x_size[0],-1)
         xt = xt.view(x_size[0],-1)

@@ -47,17 +47,45 @@ def main(config):
 
         # load the trained model
         if opt["pretrained_weights"] != None :
-            print('loading the pretrained model from ', opt["pretrained_weights"])
+            # print('loading the pretrained model from ', opt["pretrained_weights"])
             # model.load_state_dict(torch.load(opt["pretrained_weights"]))
-            model.load_state_dict(torch.load(f"./ckpts/{opt["model"]}_{loop}.pth"))
+            model.load_state_dict(torch.load(f"./ckpts/{opt["model"]}_{loop}.pth",weights_only=True))
 
 
         model = model.to(device).to(torch.float32)
-        _,_, test_loader = get_dataset(opt,loop)   
+        # _,_, test_loader = get_dataset(opt,loop)   
+        train_loader , _, test_loader= get_dataset(opt,loop)   
 
         
         with torch.no_grad():
             model.eval()
+            
+            # srcc1,srcc2,srcc3=[],[],[]
+            # label=[]
+            # for i, return_list in enumerate(tqdm(train_loader,desc='Training...')):
+            #     # for tag,_ in enumerate(return_list):
+            #         # if tag == 2:
+            #     vid_chunk, vid_chunk_g, tem_feat, tem_feat_g,\
+            #         spa_feat, spa_feat_g, mos, count, prmt = return_list[0]
+            #     # for _ in range(len(mos)):
+            #     label.append(mos[0][0].numpy())
+            #     vid_chunk = vid_chunk.to(device)
+            #     tem_feat = tem_feat.to(device)
+            #     spa_feat = spa_feat.to(device)
+            #     t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt, len(mos))
+            #     tmp=(t[3]+s[3])/2
+            #     srcc3.append(tmp.numpy())
+            #     # if i == 500:
+            #     #     break
+            # srcc3=np.array(srcc3)
+            # label=np.array(label)
+            # # scoreA=pd.read_csv('./data/T2VQA.csv').iloc[:,2]
+            # # print(srcc3[:10])
+            # # print(label[:10])
+            # PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
+            #             label, srcc3) 
+            # print(SRCC_st)
+            # return
             for dataname in opt["dataset"]:
                 testset=test_loader[dataname]
                 Tem_y, Spa_y, Ali_y = [torch.zeros([len(testset), 4]) for _ in range(3)]
