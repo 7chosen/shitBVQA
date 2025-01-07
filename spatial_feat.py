@@ -112,41 +112,35 @@ if __name__ == "__main__":
         # video_length_read = 8
 
     elif args.database == 'FETV':
-        for t2vmdl in FETV_T2V_model:
-            print('========================',t2vmdl)
-            vids_dir = f'/home/user/Documents/vqadata/FETV/{t2vmdl}/videos'
-            save_folder = f'data/FETV_spatial_all_frames/{t2vmdl}'
-            # video_names = [0]
-            # video_length_read = args.frame_num 
-            # x=np.random.randint(10)
-            dataset = VideoDataset(args.database, vids_dir, args.num_levels)
-            # print(len(dataset))
-            for i in range(args.prompt_num):
-                print(f'process {i}th vid')
-                current_data , video_length= dataset[i]
-                # current_data[0] = eg. [40 (8 images * 5 layers)]
-                features = get_features(current_data, args.layer, args.frame_batch_size, device)
-                # start_index=0
-                exit_folder(os.path.join(save_folder, str(i)))
-                for j in range(video_length):
-                    img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
-                    np.save(os.path.join(save_folder, str(i), str(j)), img_features.to('cpu').numpy())
+        # for t2vmdl in FETV_T2V_model:
+            # print('========================',t2vmdl)
+        vids_dir = f'/home/user/Documents/vqadata/FETV'
+        save_folder = f'/home/user/Documents/vqadata/BVQAdata/FETV_spa/'
+        dataset = VideoDataset_LGVQ(args.database, vids_dir, args.num_levels)
+        for i in range(len(dataset)):
+            print(f'process {i}th vid')
+            dt, f_len, nm = dataset[i]
+            features=get_features(dt,args.layer, args.frame_batch_size,device)
+            exit_folder(os.path.join(save_folder,nm))
+            for j in range(f_len):
+                img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
+                np.save(os.path.join(save_folder, nm, str(j)), img_features.to('cpu').numpy())
     
     elif args.database == 'LGVQ':
-        for t2vmdl in LGVQ_T2V_model:
-            print('======',t2vmdl,'======')
-            vids_dir = '/home/user/Documents/vqadata/LGVQ/videos/'+t2vmdl
-            save_folder=f'/home/user/Documents/vqadata/BVQAdata/LGVQ_spa/{t2vmdl}'
-            dataset=VideoDataset_LGVQ(args.database, vids_dir, args.num_levels)
+        # for t2vmdl in LGVQ_T2V_model:
+        #     print('======',t2vmdl,'======')
+        vids_dir = '/home/user/Documents/vqadata/LGVQ/'
+        save_folder=f'/home/user/Documents/vqadata/BVQAdata/LGVQ_spa/'
+        dataset=VideoDataset_LGVQ(args.database, vids_dir, args.num_levels)
 
-            for i in range(468):
-                print(f'process {i}th vid')
-                dt, f_len, nm = dataset[i]
-                features=get_features(dt,args.layer, args.frame_batch_size,device)
-                exit_folder(os.path.join(save_folder,nm))
-                for j in range(f_len):
-                    img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
-                    np.save(os.path.join(save_folder, nm, str(j)), img_features.to('cpu').numpy())
+        for i in range(len(dataset)):
+            print(f'process {i}th vid')
+            dt, f_len, nm = dataset[i]
+            features=get_features(dt,args.layer, args.frame_batch_size,device)
+            exit_folder(os.path.join(save_folder,nm))
+            for j in range(f_len):
+                img_features = features[j*(args.num_levels-1) : (j+1)*(args.num_levels-1)]
+                np.save(os.path.join(save_folder, nm, str(j)), img_features.to('cpu').numpy())
             
     elif args.database == 'T2VQA':
         vids_dir='/home/user/Documents/vqadata/T2VQA/videos'
