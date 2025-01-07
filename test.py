@@ -8,7 +8,7 @@ import torch.nn
 from tqdm import tqdm
 import yaml
 from modular_model import modular
-from modular_utils import performance_fit, performance_no_fit
+from modular_model.utils import performance_fit, performance_no_fit
 from train_dataloader import get_dataset
 from ViCLIP_models.viclip import ViCLIP
 

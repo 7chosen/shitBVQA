@@ -9,7 +9,7 @@ import random
 from tqdm import tqdm
 import yaml
 from train_dataloader import get_dataset
-from modular_utils import performance_fit, plcc_loss, plcc_rank_loss
+from modular_model.utils import performance_fit, plcc_loss, plcc_rank_loss
 from modular_model import modular
 from torch.amp import GradScaler
 
