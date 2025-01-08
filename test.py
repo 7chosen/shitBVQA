@@ -7,10 +7,10 @@ import torch.nn
 # from torchvision import transforms
 from tqdm import tqdm
 import yaml
-from modular_model import modular
-from modular_utils import performance_fit, performance_no_fit
+from modular_model import model
+from modular_model.utils import performance_fit, performance_no_fit
 from train_dataloader import get_dataset
-from ViCLIP_models.viclip import ViCLIP
+# from ViCLIP_models.viclip import ViCLIP
 
 
 def main(config):
@@ -28,15 +28,15 @@ def main(config):
     fetv_s3,fetv_p3,fetv_r3, fetv_k3 = [],[],[],[]
     for loop in range(opt["split"]):
         if opt["model"] == 'aveScore':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=opt["feat_len"])
+            model = model.ViTbCLIP_SpatialTemporal_dropout(feat_len=opt["feat_len"])
         elif opt["model"] == 'aveFeat':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout_meanpool(feat_len=opt["feat_len"])
+            model = model.ViTbCLIP_SpatialTemporal_dropout_meanpool(feat_len=opt["feat_len"])
         elif opt["model"] == 'hybrid':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout_hybrid(feat_len=opt["feat_len"])
+            model = model.ViTbCLIP_SpatialTemporal_dropout_hybrid(feat_len=opt["feat_len"])
         elif opt["model"] == 'old':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout_old(feat_len=opt["feat_len"])
+            model = model.ViTbCLIP_SpatialTemporal_dropout_old(feat_len=opt["feat_len"])
         elif opt["model"] == 'exp':
-            model = modular.ViTbCLIP_exp(opt["model_path"], opt["model_base"],
+            model = model.ViTbCLIP_exp(opt["model_path"], opt["model_base"],
                 feat_len=opt["feat_len"])
         print('The current model is: ' + opt["model"])
         
@@ -47,7 +47,7 @@ def main(config):
 
         # load the trained model
         if opt["pretrained_weights"] != None :
-            # print('loading the pretrained model from ', opt["pretrained_weights"])
+            print('loading the pretrained model from ', f"./ckpts/{opt["model"]}_{loop}.pth")
             # model.load_state_dict(torch.load(opt["pretrained_weights"]))
             model.load_state_dict(torch.load(f"./ckpts/{opt["model"]}_{loop}.pth",weights_only=True))
 

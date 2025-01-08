@@ -212,6 +212,9 @@ class Dataset_3mos(data.Dataset):
         train_index = index_rd[0:int(prompt_num*0.7)]
         val_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8)]
         test_index=index_rd[int(prompt_num*0.8):]
+        with open('my_list.txt', 'w') as file:
+            for item in test_index:
+                file.write(str(item) + '\n')
         if database == 'FETV':
             loop=4
             name_file=data_file.iloc[:,0]
@@ -411,6 +414,7 @@ def get_dataset(opt,seed):
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])])
 
+    print("current seed is: ",seed)
 
     trainset=VQAdataset('', opt["dataset"], transformations_train, 'train',seed)
     
