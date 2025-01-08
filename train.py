@@ -9,8 +9,8 @@ import random
 from tqdm import tqdm
 import yaml
 from train_dataloader import get_dataset
-from modular_model.utils import performance_fit, plcc_loss, plcc_rank_loss
-from modular_model import modular
+from modular.utils import performance_fit, plcc_loss, plcc_rank_loss
+from modular import modular_model
 from torch.amp import GradScaler
 
 
@@ -26,15 +26,9 @@ def main(config):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if opt["model"] == 'aveScore':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout(feat_len=opt["feat_len"])
-        elif opt["model"] == 'aveFeat':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout_meanpool(feat_len=opt["feat_len"])
-        elif opt["model"] == 'hybrid':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout_hybrid(feat_len=opt["feat_len"])
-        elif opt["model"] == 'old':
-            model = modular.ViTbCLIP_SpatialTemporal_dropout_old(feat_len=opt["feat_len"])
+            model = modular_model.ViTbCLIP_SpatialTemporal_dropout(feat_len=opt["feat_len"])
         elif opt["model"] == 'exp':
-            model = modular.ViTbCLIP_exp(opt["model_path"], opt["model_base"],
+            model = modular_model.ViTbCLIP_exp(opt["model_path"], opt["model_base"],
                 feat_len=opt["feat_len"])
         print('The current model is ' + opt["model"])
 
