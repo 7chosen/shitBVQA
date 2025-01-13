@@ -110,3 +110,30 @@ def plcc_l1_loss(y_label, y_output):
     plcc = plcc_loss(y_label, y_output)
     l1_loss = F.l1_loss(y_label, y_output)
     return plcc + 0.0025*l1_loss
+
+EPS = 1e-2
+esp = 1e-8
+def loss_m3(y, y_pred):
+    """prediction monotonicity related loss"""
+    assert y_pred.size(0) > 1  #
+    y_pred = y_pred.unsqueeze(1)
+    y = y.unsqueeze(1)
+    preds = y_pred-y_pred.t()
+    gts = y - y.t()
+
+    #signed = torch.sign(gts)
+
+    triu_indices = torch.triu_indices(y_pred.size(0), y_pred.size(0), offset=1)
+    preds = preds[triu_indices[0], triu_indices[1]]
+    gts = gts[triu_indices[0], triu_indices[1]]
+    g = 0.5 * (torch.sign(gts) + 1)
+
+    constant = torch.sqrt(torch.Tensor([2.])).to(preds.device)
+    p = 0.5 * (1 + torch.erf(preds / constant))
+
+    g = g.view(-1, 1)
+    p = p.view(-1, 1)
+
+    loss = torch.mean((1 - (torch.sqrt(p * g + esp) + torch.sqrt((1 - p) * (1 - g) + esp))))
+
+    return loss

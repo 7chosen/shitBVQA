@@ -212,9 +212,6 @@ class Dataset_3mos(data.Dataset):
         train_index = index_rd[0:int(prompt_num*0.7)]
         val_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8)]
         test_index=index_rd[int(prompt_num*0.8):]
-        with open('my_list.txt', 'w') as file:
-            for item in test_index:
-                file.write(str(item) + '\n')
         if database == 'FETV':
             loop=4
             name_file=data_file.iloc[:,0]

@@ -7,8 +7,8 @@ import torch.nn
 # from torchvision import transforms
 from tqdm import tqdm
 import yaml
-from modular_model import model
-from modular_model.utils import performance_fit, performance_no_fit
+from modular import modular_model
+from modular.utils import performance_fit, performance_no_fit
 from train_dataloader import get_dataset
 # from ViCLIP_models.viclip import ViCLIP
 
@@ -28,15 +28,9 @@ def main(config):
     fetv_s3,fetv_p3,fetv_r3, fetv_k3 = [],[],[],[]
     for loop in range(opt["split"]):
         if opt["model"] == 'aveScore':
-            model = model.ViTbCLIP_SpatialTemporal_dropout(feat_len=opt["feat_len"])
-        elif opt["model"] == 'aveFeat':
-            model = model.ViTbCLIP_SpatialTemporal_dropout_meanpool(feat_len=opt["feat_len"])
-        elif opt["model"] == 'hybrid':
-            model = model.ViTbCLIP_SpatialTemporal_dropout_hybrid(feat_len=opt["feat_len"])
-        elif opt["model"] == 'old':
-            model = model.ViTbCLIP_SpatialTemporal_dropout_old(feat_len=opt["feat_len"])
+            model = modular_model.ViTbCLIP_SpatialTemporal_dropout(feat_len=opt["feat_len"])
         elif opt["model"] == 'exp':
-            model = model.ViTbCLIP_exp(opt["model_path"], opt["model_base"],
+            model = modular_model.ViTbCLIP_exp(opt["model_path"], opt["model_base"],
                 feat_len=opt["feat_len"])
         print('The current model is: ' + opt["model"])
         

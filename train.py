@@ -9,7 +9,7 @@ import random
 from tqdm import tqdm
 import yaml
 from train_dataloader import get_dataset
-from modular.utils import performance_fit, plcc_loss, plcc_rank_loss
+from modular.utils import performance_fit, plcc_loss, plcc_rank_loss, loss_m3
 from modular import modular_model
 from torch.amp import GradScaler
 
@@ -52,6 +52,8 @@ def main(config):
             criterion = nn.L1Loss().to(device)
         elif opt["loss_type"] == 'Huberloss':
             criterion = nn.HuberLoss().to(device)
+        elif opt["loss_type"] == "m3":
+            criterion = loss_m3
 
         model.clip.logit_scale.requires_grad = False
         param_num = 0
