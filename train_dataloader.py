@@ -61,7 +61,6 @@ class Dataset_1mos(data.Dataset):
 
     def __getitem__(self, idx):
         
-        # score=torch.FloatTensor(np.array(float(self.score[idx])))
         score=self.score[idx]
         for ele in score:
             ele=torch.FloatTensor(np.array(float(ele)))
@@ -199,6 +198,8 @@ class Dataset_1mos(data.Dataset):
             return img_l, img_g, t_l, t_g, \
                 s_l, s_g, score, count, prmt
         
+
+
 
 class Dataset_3mos(data.Dataset):
     def __init__(self, database, datatype, vids_dir, temporalFeat, spatialFeat, mosfile_path, transform,

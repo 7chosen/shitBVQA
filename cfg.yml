@@ -1,9 +1,8 @@
-# database: T2VQA
-model: aveScore
+model: clip
+
 model_path: /home/user/Documents/vqadata/t2vqa_qalign
 model_base: 
 
-# model: aveScore
 feat_len: 8
 split: 10
 epochs: 15
