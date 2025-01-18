@@ -65,10 +65,14 @@ class ViTbCLIP(torch.nn.Module):
         )
         return regression_block
 
-    def forward(self, x, tem_feat, spa_feat, prmt, num):
-        x_size = x.shape
+    def forward(self, x, tem_feat, spa_feat, prmt, tag):
+        
+        
         # x: (batch * frames) x 3-channel x height x width
         # eg. 128*3*224*224
+        if tag[0] == 'I' and x.dim()==4:
+            x=x.unsqueeze(1)
+        x_size = x.shape
         x = x.view(-1, x_size[2], x_size[3], x_size[4])
 
         # input shape (batch_size*frame_num)*c*h*w, which h and w must be 224
@@ -143,7 +147,21 @@ class ViTbCLIP(torch.nn.Module):
         xs = torch.mean(xs, dim=1).unsqueeze(1)
         xt = torch.mean(xt, dim=1).unsqueeze(1)
         xa = torch.mean(xa, dim=1).unsqueeze(1)
+        
+        if tag[0] == 'I':
+            _=xt.squeeze(1)
+            t = torch.stack((_,_,_,xt.squeeze(1)))
+            s = torch.stack((_,_,_,xs.squeeze(1)))
+            a = torch.stack((_,_,_,xa.squeeze(1)))
 
+            # if batch_size == 1, then return shape[4] directly
+            if (x_size[0] == 1):
+                t, s, a = t.squeeze(1).to('cpu'), s.squeeze(
+                    1).to('cpu'), a.squeeze(1).to('cpu')
+
+            return t, s, a
+        
+        
         assert xa.shape == xs.shape == xt.shape, "shape is not same"
         ones = torch.ones_like(xa)
 

@@ -16,28 +16,33 @@ dataset:
   #   prompt_num: 468
   #   vids_dir: /home/user/Documents/vqadata/LGVQ
   #   tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_tem
-    # spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_spa
-  # FETV:
-  #   mos_num: 3
-  #   mos_file: ./data/FETV.csv
-  #   prompt_num: 619
-  #   vids_dir: /home/user/Documents/vqadata/FETV
-  #   tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_tem
-  #   spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_spa
-  T2VQA:
+  #   spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/LGVQ_spa
+  FETV:
+    mos_num: 3
+    mos_file: ./data/FETV.csv
+    prompt_num: 619
+    vids_dir: /home/user/Documents/vqadata/FETV
+    tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_tem
+    spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/FETV_spa
+  # T2VQA:
+  #   mos_num: 1
+  #   mos_file: ./data/T2VQA.csv
+  #   prompt_num: 1000
+  #   vids_dir: /home/user/Documents/vqadata/T2VQA/videos
+  #   tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_tem
+  #   spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_spa
+  AIGC:
     mos_num: 1
-    mos_file: ./data/T2VQA.csv
-    prompt_num: 1000
-    vids_dir: /home/user/Documents/vqadata/T2VQA/videos
-    tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_tem
-    spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_spa
+    mos_file: ./data/AIGC30K.csv
+    prompt_num: 20000
+    vids_dir: /home/user/Documents/AIGCQA30K/images
 
 # model config
 lr: !!float 5e-6
 decay_ratio: !!float 0.9
 decay_interval: 4
 print_samples: 2000
-train_batch_size: 16
+train_batch_size: 8
 num_workers: 8
 # loss_type: m3
 loss_type: plcc
@@ -45,7 +50,7 @@ loss_type: plcc
 resize: 256
 crop_size: 224
 
-pretrained_weights: ckpts/0.pth
+# pretrained_weights: ckpts/0.pth
 
         
         

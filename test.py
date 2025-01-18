@@ -19,6 +19,7 @@ def main(config):
     with open(config.opt, "r") as f:
         opt = yaml.safe_load(f)
 
+    aigc_s, aigc_p, aigc_r, aigc_k = [], [], [], []
     t2vqa_s, t2vqa_p, t2vqa_r, t2vqa_k = [], [], [], []
     lgvq_s1, lgvq_p1, lgvq_r1, lgvq_k1 = [], [], [], []
     lgvq_s2, lgvq_p2, lgvq_r2, lgvq_k2 = [], [], [], []
@@ -26,10 +27,11 @@ def main(config):
     fetv_s1, fetv_p1, fetv_r1, fetv_k1 = [], [], [], []
     fetv_s2, fetv_p2, fetv_r2, fetv_k2 = [], [], [], []
     fetv_s3, fetv_p3, fetv_r3, fetv_k3 = [], [], [], []
+    
     for loop in range(opt["split"]):
-        if opt["model"] == 'aveScore':
+        if opt["model"] == 'clip':
             model = modular_model.ViTbCLIP(feat_len=opt["feat_len"])
-        elif opt["model"] == 'exp':
+        elif opt["model"] == 'qalign':
             model = modular_model.ViTbQalign(opt["model_path"], opt["model_base"],
                                              feat_len=opt["feat_len"])
         print('The current model is: ' + opt["model"])
@@ -40,16 +42,16 @@ def main(config):
         # else:
 
         # load the trained model
-        if opt["pretrained_weights"] != None:
-            print('loading the pretrained model from ',
-                  f"./ckpts/{opt["model"]}_{loop}.pth")
-            # model.load_state_dict(torch.load(opt["pretrained_weights"]))
-            model.load_state_dict(torch.load(
-                f"./ckpts/{opt["model"]}_{loop}.pth", weights_only=True))
+        # if opt["pretrained_weights"] != None:
+        print('loading the pretrained model from ',
+                f"./ckpts/{opt["model"]}_{loop}.pth")
+        # model.load_state_dict(torch.load(opt["pretrained_weights"]))
+        model.load_state_dict(torch.load(
+            f"./ckpts/{opt["model"]}_{loop}.pth", weights_only=True))
 
         model = model.to(device).to(torch.float32)
         # _,_, test_loader = get_dataset(opt,loop)
-        train_loader, _, test_loader = get_dataset(opt, loop)
+        _, _, test_loader = get_dataset(opt, loop)
 
         with torch.no_grad():
             model.eval()
@@ -88,7 +90,7 @@ def main(config):
                 for i, _ in enumerate(tqdm(testset, desc=f"{dataname} testing...")):
 
                     vid_chunk, vid_chunk_g, tem_feat, tem_feat_g, \
-                        spa_feat, spa_feat_g, mos, count, prmt = _[0]
+                        spa_feat, spa_feat_g, mos, count, prmt , tag= _[0]
                     for j in range(len(mos)):
                         label[i][j] = mos[j].item()
 
@@ -99,19 +101,27 @@ def main(config):
                         x = vid_chunk[:, j, ...].to(device)
                         y = tem_feat[:, j, ...].to(device)
                         z = spa_feat[:, j, ...].to(device)
-                        t, s, a = model(x, y, z, prmt, len(mos))
+                        t, s, a = model(x, y, z, prmt, tag)
                         mid_t, mid_s, mid_a = mid_t+t, mid_s+s, mid_a+a
-                    mid_t, mid_s, mid_a = mid_t/count, mid_s/count, mid_a/count
+                    if count != 0:
+                        mid_t, mid_s, mid_a = mid_t/count, mid_s/count, mid_a/count
 
                     x = vid_chunk_g.to(device)
                     y = tem_feat_g.to(device)
                     z = spa_feat_g.to(device)
-                    t, s, a = model(x, y, z, prmt, len(mos))
-                    Tem_y[i], Spa_y[i], Ali_y[i] = (
-                        mid_t + t)/2, (mid_s + s)/2, (mid_a + a)/2
+                    t, s, a = model(x, y, z, prmt, tag)
+                    Tem_y[i], Spa_y[i], Ali_y[i] = (mid_t + t)/2, (mid_s + s)/2, (mid_a + a)/2
 
                 Tem_y, Spa_y, Ali_y = Tem_y.cpu().numpy(), Spa_y.cpu().numpy(), Ali_y.cpu().numpy()
-                if dataname == 'T2VQA':
+                if dataname == 'AIGC':
+                    PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
+                            label[:, 0], Spa_y[:, 3])
+                    aigc_s.append(SRCC_st)
+                    aigc_p.append(PLCC_st)
+                    aigc_r.append(RMSE_st)
+                    aigc_k.append(KRCC_st)
+                    
+                elif dataname == 'T2VQA':
                     PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
                         label[:, 0], (Tem_y[:, 3]+Spa_y[:, 3])/2)
                     # print('{} final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
@@ -177,6 +187,9 @@ def main(config):
 
     print('T2VQA final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
         np.median(t2vqa_s), np.median(t2vqa_k), np.median(t2vqa_p), np.median(t2vqa_r))
+    )
+    print('AIGC final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
+        np.median(aigc_s), np.median(aigc_k), np.median(aigc_p), np.median(aigc_r))
     )
 
 

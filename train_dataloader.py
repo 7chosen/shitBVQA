@@ -6,8 +6,8 @@ import cv2
 import torch
 from torch.utils import data
 import numpy as np
-import scipy.io as scio
-import math
+# import scipy.io as scio
+# import math
 import decord
 from torchvision import transforms
 
@@ -116,7 +116,7 @@ class Dataset_1mos(data.Dataset):
             final_tem=feature_tem[:,:,select_idx,:,:].squeeze().permute(1,0)
             # print(score)
                 
-            return final_imgs, [], final_tem, [], final_spa, [], score, 0, prmt
+            return final_imgs, [], final_tem, [], final_spa, [], score, 0, prmt, 'V'
             
         # val/test
         else:
@@ -196,10 +196,58 @@ class Dataset_1mos(data.Dataset):
             t_g = feature_tem[:,:,select_idx,:,:].squeeze().permute(1,0)
             
             return img_l, img_g, t_l, t_g, \
-                s_l, s_g, score, count, prmt
+                s_l, s_g, score, count, prmt, 'V'
         
+class Dataset_1mos_img(data.Dataset):
+    def __init__(self, database, datatype, vids_dir, csv_path, transform,
+                prompt_num, seed=0):
+        super(Dataset_1mos_img, self).__init__()
+        data_file=pd.read_csv(csv_path,dtype={"name":str})
+        random.seed(seed)
+        np.random.seed(seed)
+        index_rd = np.random.permutation(prompt_num)
+        train_index = index_rd[0:int(prompt_num*0.7)]
+        val_index=index_rd[int(prompt_num*0.7):int(prompt_num*0.8)]
+        test_index=index_rd[int(prompt_num*0.8):]
+        self.vid_path_dir=[]
+        self.prompt_name=[]
+        self.score=[]
+        name_file=data_file.iloc[:,0]
+        prompt_file=data_file.iloc[:,1]
+        mos_file=data_file.iloc[:,7]
+        if datatype == 'train':
+            final_idx=train_index
+        elif datatype == 'val':
+            final_idx=val_index
+        else:
+            final_idx=test_index
+            
+        for idx in final_idx:
+            self.score.append([mos_file[idx]])
+            self.prompt_name.append(prompt_file[idx])
+            self.vid_path_dir.append(os.path.join(vids_dir,name_file[idx]))
+        self.transform = transform
 
 
+    def __len__(self):
+        return len(self.score)
+
+    def __getitem__(self, idx):
+        
+        score=self.score[idx]
+        for ele in score:
+            ele=torch.FloatTensor(np.array(float(ele)))
+        prmt=self.prompt_name[idx]
+        vid_path = self.vid_path_dir[idx]
+        vid = cv2.imread(vid_path)
+        cur_frame = cv2.cvtColor(vid,cv2.COLOR_BGR2RGB)
+        cur_frame = Image.fromarray(cur_frame)
+        cur_frame=self.transform(cur_frame)
+    
+            
+        return cur_frame, cur_frame, \
+            torch.zeros([]), torch.zeros([]), torch.zeros([]), torch.zeros([]), score, 0, prmt, 'I'
+        
 
 class Dataset_3mos(data.Dataset):
     def __init__(self, database, datatype, vids_dir, temporalFeat, spatialFeat, mosfile_path, transform,
@@ -317,7 +365,7 @@ class Dataset_3mos(data.Dataset):
             final_tem=feature_tem[:,:,select_idx,:,:].squeeze().permute(1,0)
                 
             # print(final_imgs.shape[0])
-            return final_imgs, [], final_tem, [], final_spa, [], score, 0, prmt
+            return final_imgs, [], final_tem, [], final_spa, [], score, 0, prmt, 'V'
             
         # val/test
         else:
@@ -397,7 +445,7 @@ class Dataset_3mos(data.Dataset):
             t_g = feature_tem[:,:,select_idx,:,:].squeeze().permute(1,0)
             
             return img_l, img_g, t_l, t_g, \
-                s_l, s_g, score, count, prmt
+                s_l, s_g, score, count, prmt, 'V'
         
 
 def get_dataset(opt,seed):
@@ -440,7 +488,10 @@ class VQAdataset(data.Dataset):
         dataset=dict()
         if specified == '':
             for key in args:
-                if args[key]["mos_num"] == 3:
+                if key == 'AIGC':
+                    temset = Dataset_1mos_img(key,datatype,args[key]["vids_dir"],
+                                args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
+                elif args[key]["mos_num"] == 3:
                     temset=Dataset_3mos(key, datatype, args[key]["vids_dir"], 
                                 args[key]["tem_feat_dir"],args[key]["spa_feat_dir"],
                                 args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
@@ -451,7 +502,10 @@ class VQAdataset(data.Dataset):
                 dataset[key]=temset
         else:
             key=specified
-            if args[key]["mos_num"] == 3:
+            if key == 'AIGC':
+                temset = Dataset_1mos_img(key,datatype,args[key]["vids_dir"],
+                                args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
+            elif args[key]["mos_num"] == 3:
                 temset=Dataset_3mos(key, datatype, args[key]["vids_dir"], 
                             args[key]["tem_feat_dir"],args[key]["spa_feat_dir"],
                             args[key]["mos_file"], transform, args[key]["prompt_num"], seed=seed)
