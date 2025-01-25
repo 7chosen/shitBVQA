@@ -148,16 +148,20 @@ class ViTbCLIP(torch.nn.Module):
         xt = torch.mean(xt, dim=1).unsqueeze(1)
         xa = torch.mean(xa, dim=1).unsqueeze(1)
         
+        # t,s,a=xt.squeeze(1), xs.squeeze(1), xa.squeeze(1)
+        # if (x_size[0] == 1):
+        #     t, s, a = xt.to('cpu'), xs.to('cpu'), xa.to('cpu')
+        # return t, s, a
+        
+        
         if tag[0] == 'I':
-            _=xt.squeeze(1)
-            t = torch.stack((_,_,_,xt.squeeze(1)))
-            s = torch.stack((_,_,_,xs.squeeze(1)))
-            a = torch.stack((_,_,_,xa.squeeze(1)))
+            t = xt.squeeze(1)
+            s = xs.squeeze(1)
+            a = xa.squeeze(1)
 
             # if batch_size == 1, then return shape[4] directly
             if (x_size[0] == 1):
-                t, s, a = t.squeeze(1).to('cpu'), s.squeeze(
-                    1).to('cpu'), a.squeeze(1).to('cpu')
+                t, s, a = t.to('cpu'), s.to('cpu'), a.to('cpu')
 
             return t, s, a
         
@@ -255,7 +259,7 @@ class ViTbCLIP(torch.nn.Module):
             t, s, a = t.squeeze(1).to('cpu'), s.squeeze(
                 1).to('cpu'), a.squeeze(1).to('cpu')
 
-        return t, s, a
+        return t[3], s[3], a[3]
 
 
 strings = [

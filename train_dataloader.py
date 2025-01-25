@@ -62,8 +62,8 @@ class Dataset_1mos(data.Dataset):
     def __getitem__(self, idx):
         
         score=self.score[idx]
-        for ele in score:
-            ele=torch.FloatTensor(np.array(float(ele)))
+        for i in range(len(score)):
+            score[i] = torch.tensor(float(score[i]), dtype=torch.float32)
         prmt=self.prompt_name[idx]
         vid_path = self.vid_path_dir[idx]+'.mp4'
         vid = decord.VideoReader(vid_path)
@@ -202,7 +202,12 @@ class Dataset_1mos_img(data.Dataset):
     def __init__(self, database, datatype, vids_dir, csv_path, transform,
                 prompt_num, seed=0):
         super(Dataset_1mos_img, self).__init__()
-        data_file=pd.read_csv(csv_path,dtype={"name":str})
+        import chardet
+        with open(csv_path, 'rb') as f:
+            result = chardet.detect(f.read())
+
+        encoding = result['encoding']
+        data_file = pd.read_csv(csv_path, encoding=encoding)
         random.seed(seed)
         np.random.seed(seed)
         index_rd = np.random.permutation(prompt_num)
@@ -214,7 +219,9 @@ class Dataset_1mos_img(data.Dataset):
         self.score=[]
         name_file=data_file.iloc[:,0]
         prompt_file=data_file.iloc[:,1]
-        mos_file=data_file.iloc[:,7]
+        qlt_file=data_file.iloc[:,2]
+        ali_file=data_file.iloc[:,3]
+        sum_flle=data_file.iloc[:,4]
         if datatype == 'train':
             final_idx=train_index
         elif datatype == 'val':
@@ -223,7 +230,7 @@ class Dataset_1mos_img(data.Dataset):
             final_idx=test_index
             
         for idx in final_idx:
-            self.score.append([mos_file[idx]])
+            self.score.append([qlt_file[idx],ali_file[idx],sum_flle[idx]])
             self.prompt_name.append(prompt_file[idx])
             self.vid_path_dir.append(os.path.join(vids_dir,name_file[idx]))
         self.transform = transform
@@ -235,15 +242,15 @@ class Dataset_1mos_img(data.Dataset):
     def __getitem__(self, idx):
         
         score=self.score[idx]
-        for ele in score:
-            ele=torch.FloatTensor(np.array(float(ele)))
+        for i in range(len(score)):
+            score[i] = torch.tensor(float(score[i]), dtype=torch.float32)
         prmt=self.prompt_name[idx]
         vid_path = self.vid_path_dir[idx]
         vid = cv2.imread(vid_path)
         cur_frame = cv2.cvtColor(vid,cv2.COLOR_BGR2RGB)
         cur_frame = Image.fromarray(cur_frame)
         cur_frame=self.transform(cur_frame)
-    
+        # print(score[0].dtype)
             
         return cur_frame, cur_frame, \
             torch.zeros([]), torch.zeros([]), torch.zeros([]), torch.zeros([]), score, 0, prmt, 'I'
@@ -309,10 +316,9 @@ class Dataset_3mos(data.Dataset):
 
     def __getitem__(self, idx):
         
-        # score=torch.FloatTensor(np.array(float(self.score[idx])))
         score=self.score[idx]
-        for ele in score:
-            ele=torch.FloatTensor(np.array(float(ele)))
+        for i in range(len(score)):
+            score[i] = torch.tensor(float(score[i]), dtype=torch.float32)
         prmt=self.prompt_name[idx]
 
         vid_path = self.vid_path_dir[idx]+'.mp4'

@@ -4,12 +4,13 @@ model_path: /home/user/Documents/vqadata/t2vqa_qalign
 model_base: 
 
 feat_len: 8
-split: 10
-epochs: 15
+split: 1
+epochs: 10
 save_model: True
 
 # data config
 dataset:
+
   # LGVQ:
   #   mos_num: 3
   #   mos_file: ./data/LGVQ.csv
@@ -31,11 +32,12 @@ dataset:
   #   vids_dir: /home/user/Documents/vqadata/T2VQA/videos
   #   tem_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_tem
   #   spa_feat_dir: /home/user/Documents/vqadata/BVQAdata/T2VQA_spa
-  AIGC:
-    mos_num: 1
-    mos_file: ./data/AIGC30K.csv
-    prompt_num: 20000
-    vids_dir: /home/user/Documents/AIGCQA30K/images
+  # AIGC:
+  #   mos_num: 1
+  #   mos_file: ./data/AIGC30K.csv
+  #   prompt_num: 20000
+  #   vids_dir: /home/user/Documents/AIGCQA30K/images
+
 
 # model config
 lr: !!float 5e-6

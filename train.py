@@ -12,10 +12,11 @@ from train_dataloader import get_dataset
 from modular.utils import performance_fit, plcc_loss, plcc_rank_loss, loss_m3
 from modular import modular_model
 from torch.amp import GradScaler
-
+import wandb
 
 def main(config):
-
+    # wandb.init(project="mineBVQA")
+    
     with open(config.opt, "r") as f:
         opt = yaml.safe_load(f)
 
@@ -81,36 +82,42 @@ def main(config):
             print(f'=== Current epoch: {epoch+1} ===')
             model.train()
             for i, return_list in enumerate(tqdm(train_loader, desc='Training...')):
-                allloss=0
+                
+                t2iloss,t2vloss=torch.zeros(3),torch.zeros(3)
                 for _ in return_list:
                     optimizer.zero_grad()
                     vid_chunk, vid_chunk_g, tem_feat, tem_feat_g, \
                         spa_feat, spa_feat_g, mos, count, prmt, tag= _
-                    label = []
-                    for _ in range(len(mos)):
-                        label.append(mos[_].to(device).float())
+                    label = [x.to(device) for x in mos]
                     vid_chunk = vid_chunk.to(device)
                     tem_feat = tem_feat.to(device)
                     spa_feat = spa_feat.to(device)
                     with torch.autocast(device_type='cuda', dtype=torch.float16):
-                        t, s, a = model(vid_chunk, tem_feat,
-                                        spa_feat, prmt, tag)
-                        if tag[0] == 'I':
-                            loss = criterion(label[0],s[3])
+                        t, s, a = model(vid_chunk, tem_feat, spa_feat, prmt, tag)
+                        if tag[0] == 'I' :
+                            # t2iloss[1]=criterion(label[0],s) 
+                            # t2iloss[2]=criterion(label[1],a)
+                            t2iloss[2]=criterion(label[2],s)
                         elif len(mos) == 1:
-                            loss = criterion(label[0], (t[3]+s[3])/2)
+                            t2vloss[2] = criterion(label[0], (t+s)/2)
                         elif len(mos) == 3:
-                            loss = criterion(label[0], t[3]) \
-                                + criterion(label[1], s[3]) \
-                                + criterion(label[2], a[3])
+                            t2vloss[0]=criterion(label[0], t)
+                            t2vloss[1]=criterion(label[1], s)
+                            t2vloss[2]=criterion(label[2], a)
                         else:
-                            raise Exception('The number of mos is not correct')
-                        loss /= len(mos)
-                    if torch.isnan(loss):
-                        raise Exception('Loss is NaN')
-                    allloss+=loss
-                    allloss/=len(return_list)
-
+                            raise Exception('debug here')
+                
+                
+                # s/t loss divide by 2
+                loss=[(x+y)/2 for x,y in zip(t2iloss,t2vloss)]
+                # Quality t don't divide by 2
+                # loss[0]=t2vloss[0]
+                # allloss=sum(loss)/3
+                
+                allloss=sum(loss)
+                # allloss=t2vloss[2]
+                # wandb.log({"loss": allloss.item()})
+                
                 scaler.scale(allloss).backward()
                 scaler.step(optimizer)
                 scaler.update()
@@ -123,7 +130,7 @@ def main(config):
                 for dataname in opt["dataset"]:
                     valset = val_loader[dataname]
                     Tem_y, Spa_y, Ali_y = [torch.zeros(
-                        [len(valset), 4]) for _ in range(3)]
+                        [len(valset)]) for _ in range(3)]
                     label = np.zeros([len(valset), 3])
                     for i, _ in enumerate(tqdm(valset, desc=f"{dataname} validating...")):
 
@@ -133,7 +140,7 @@ def main(config):
                             label[i][j] = mos[j].item()
 
                         # mid_t stores xt,qt-t,qs-t,qst-t
-                        mid_t, mid_s, mid_a = [torch.zeros(4) for _ in range(3)]
+                        mid_t, mid_s, mid_a = [torch.zeros(1) for _ in range(3)]
 
                         for j in range(count):
                             x = vid_chunk[:, j, ...].to(device)
@@ -154,23 +161,23 @@ def main(config):
                     Tem_y, Spa_y, Ali_y = Tem_y.cpu().numpy(), Spa_y.cpu().numpy(), Ali_y.cpu().numpy()
                     if dataname == 'T2VQA':
                         PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
-                            label[:, 0], (Tem_y[:, 3]+Spa_y[:, 3])/2)
+                            label[:, 0], (Tem_y+Spa_y)/2)
                         print('{} final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
                             dataname, SRCC_st, KRCC_st, PLCC_st, RMSE_st))
                         print('===')
                     elif dataname == 'AIGC':
                         PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
-                            label[:, 0], Spa_y[:, 3])
+                            label[:, 2], Spa_y)
                         print('{} final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
                             dataname, SRCC_st, KRCC_st, PLCC_st, RMSE_st))
                         print('===')
                     else:
                         tPLCC_st, tSRCC_st, tKRCC_st, tRMSE_st = performance_fit(
-                            label[:, 0], Tem_y[:, 3])
+                            label[:, 0], Tem_y)
                         sPLCC_st, sSRCC_st, sKRCC_st, sRMSE_st = performance_fit(
-                            label[:, 1], Spa_y[:, 3])
+                            label[:, 1], Spa_y)
                         aPLCC_st, aSRCC_st, aKRCC_st, aRMSE_st = performance_fit(
-                            label[:, 2], Ali_y[:, 3])
+                            label[:, 2], Ali_y)
                         print('{} final tem ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
                             dataname, tSRCC_st, tKRCC_st, tPLCC_st, tRMSE_st))
                         print('{} final spa ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(

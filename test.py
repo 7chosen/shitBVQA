@@ -85,7 +85,7 @@ def main(config):
             for dataname in opt["dataset"]:
                 testset = test_loader[dataname]
                 Tem_y, Spa_y, Ali_y = [torch.zeros(
-                    [len(testset), 4]) for _ in range(3)]
+                    [len(testset)]) for _ in range(3)]
                 label = np.zeros([len(testset), 3])
                 for i, _ in enumerate(tqdm(testset, desc=f"{dataname} testing...")):
 
@@ -95,15 +95,15 @@ def main(config):
                         label[i][j] = mos[j].item()
 
                     # mid_t stores xt,qt-t,qs-t,qst-t
-                    mid_t, mid_s, mid_a = [torch.zeros(4) for _ in range(3)]
+                    mid_t, mid_s, mid_a = [torch.zeros(1) for _ in range(3)]
 
-                    for j in range(count):
-                        x = vid_chunk[:, j, ...].to(device)
-                        y = tem_feat[:, j, ...].to(device)
-                        z = spa_feat[:, j, ...].to(device)
-                        t, s, a = model(x, y, z, prmt, tag)
-                        mid_t, mid_s, mid_a = mid_t+t, mid_s+s, mid_a+a
-                    if count != 0:
+                    if count!=0:
+                        for j in range(count):
+                            x = vid_chunk[:, j, ...].to(device)
+                            y = tem_feat[:, j, ...].to(device)
+                            z = spa_feat[:, j, ...].to(device)
+                            t, s, a = model(x, y, z, prmt, tag)
+                            mid_t, mid_s, mid_a = mid_t+t, mid_s+s, mid_a+a
                         mid_t, mid_s, mid_a = mid_t/count, mid_s/count, mid_a/count
 
                     x = vid_chunk_g.to(device)
@@ -115,7 +115,7 @@ def main(config):
                 Tem_y, Spa_y, Ali_y = Tem_y.cpu().numpy(), Spa_y.cpu().numpy(), Ali_y.cpu().numpy()
                 if dataname == 'AIGC':
                     PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
-                            label[:, 0], Spa_y[:, 3])
+                            label[:, 2], Spa_y)
                     aigc_s.append(SRCC_st)
                     aigc_p.append(PLCC_st)
                     aigc_r.append(RMSE_st)
@@ -123,7 +123,7 @@ def main(config):
                     
                 elif dataname == 'T2VQA':
                     PLCC_st, SRCC_st, KRCC_st, RMSE_st = performance_fit(
-                        label[:, 0], (Tem_y[:, 3]+Spa_y[:, 3])/2)
+                        label[:, 0], (Tem_y+Spa_y)/2)
                     # print('{} final ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
                     #     dataname, SRCC_st, KRCC_st, PLCC_st, RMSE_st))
                     # print('===')
@@ -133,11 +133,11 @@ def main(config):
                     t2vqa_k.append(KRCC_st)
                 else:
                     tPLCC_st, tSRCC_st, tKRCC_st, tRMSE_st = performance_fit(
-                        label[:, 0], Tem_y[:, 3])
+                        label[:, 0], Tem_y)
                     sPLCC_st, sSRCC_st, sKRCC_st, sRMSE_st = performance_fit(
-                        label[:, 1], Spa_y[:, 3])
+                        label[:, 1], Spa_y)
                     aPLCC_st, aSRCC_st, aKRCC_st, aRMSE_st = performance_fit(
-                        label[:, 2], Ali_y[:, 3])
+                        label[:, 2], Ali_y)
                     # print('{} final tem ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
                     #     dataname, tSRCC_st, tKRCC_st, tPLCC_st, tRMSE_st))
                     # print('{} final spa ST: {:.4f}, {:.4f}, {:.4f}, {:.4f},'.format(
